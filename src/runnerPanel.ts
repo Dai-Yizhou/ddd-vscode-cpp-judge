@@ -671,13 +671,13 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             }
         }
 
-        // 拖拽支持：优先 File API，其次 file:// URI，最后纯文本路径
-        // VS Code Webview 出于安全原因不暴露 File.path，因此 File API 方式直接读取文本内容。
-        // 大文件（>10MB）请使用"载入文件"按钮（走原生选择器，支持路径标记 + 管道输入）。
-        const DROP_MAX_SIZE = 10 * 1024 * 1024; // 拖拽直接载入的大小上限 10MB
-        function setupDrop(areaId, overlayId) {
+        // 拖拽支持：统一通过扩展主进程加载文件
+        // 无论大小，均发送 file:// URI 或路径给扩展主进程，由扩展主进程统一处理：
+        //   - 小文件：完整读取内容并填入 textarea
+        //   - 大文件（>1MB）：读取前 64KB 作为只读预览，运行时从文件流式读取
+        // 这样用户无需区分加载方式，拖拽与"载入文件"按钮行为完全一致。
+        function setupDrop(areaId) {
             const area = $(areaId);
-            const editor = areaId === 'inputArea' ? inputEditor : expectedEditor;
             const hintEl = areaId === 'inputArea' ? $('inputFileHint') : $('expectedFileHint');
             const target = areaId === 'inputArea' ? 'input' : 'expected';
             // dragenter/dragover 必须阻止默认行为才能触发 drop
@@ -694,55 +694,43 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 // 仅当离开 area 本身（而非子元素）时移除
                 if (e.target === area) area.classList.remove('drag-over');
             });
-            area.addEventListener('drop', async (e) => {
+            area.addEventListener('drop', (e) => {
                 e.preventDefault(); e.stopPropagation();
                 area.classList.remove('drag-over');
 
-                // 1. 尝试 File API（Webview 内直接读取文件内容）
-                const files = e.dataTransfer.files;
-                if (files && files.length > 0) {
-                    const file = files[0];
-                    if (file.size > DROP_MAX_SIZE) {
-                        // 大文件：避免一次性填入 textarea 造成卡顿，提示使用"载入文件"按钮
-                        hintEl.textContent = file.name + ' (' + (file.size / 1048576).toFixed(1) + ' MB) 过大，请用"载入文件"按钮';
-                        return;
-                    }
-                    try {
-                        const content = await file.text();
-                        editor.value = content;
-                        hintEl.textContent = file.name;
-                    } catch (err) {
-                        hintEl.textContent = '读取失败: ' + err.message;
-                    }
-                    return;
-                }
-
-                // 2. 尝试 text/uri-list（file:// URI）
+                // 优先使用 text/uri-list（跨平台 file:// URI）
+                // macOS Finder 拖拽优先提供 text/uri-list，Windows 资源管理器也支持
                 const uriList = e.dataTransfer.getData('text/uri-list');
                 if (uriList && uriList.trim()) {
-                    const uri = uriList.trim().split('\\n')[0].trim();
+                    const uri = uriList.trim().split(/\r?\n/)[0].trim();
                     if (uri) {
                         vscode.postMessage({ command: 'loadFileRequest', target: target, fileUri: uri });
-                        hintEl.textContent = '正在载入: ' + uri;
+                        hintEl.textContent = '正在载入...';
                         return;
                     }
                 }
 
-                // 3. 尝试 text/plain（文件路径）
-                const plainText = e.dataTransfer.getData('text/plain');
-                if (plainText && plainText.trim()) {
-                    const path = plainText.trim();
-                    vscode.postMessage({ command: 'loadFileRequest', target: target, fileUri: path });
-                    hintEl.textContent = '正在载入: ' + path;
+                // 回退：File API 获取文件名（仅用于显示提示）
+                const files = e.dataTransfer.files;
+                if (files && files.length > 0) {
+                    const fileName = files[0].name;
+                    hintEl.textContent = '无法获取文件路径，请尝试点击"载入文件"按钮';
                     return;
                 }
 
-                // 4. 所有方法均失败：显示提示
+                // 纯文本路径
+                const plainText = e.dataTransfer.getData('text/plain');
+                if (plainText && plainText.trim()) {
+                    vscode.postMessage({ command: 'loadFileRequest', target: target, fileUri: plainText.trim() });
+                    hintEl.textContent = '正在载入...';
+                    return;
+                }
+
                 hintEl.textContent = '无法识别拖拽内容，请拖拽文件或使用"载入文件"按钮';
             });
         }
-        setupDrop('inputArea', 'inputDropOverlay');
-        setupDrop('expectedArea', 'expectedDropOverlay');
+        setupDrop('inputArea');
+        setupDrop('expectedArea');
 
         // 用户手动编辑 textarea 时清除大文件路径标记，恢复可编辑模式
         // 大文件预览是只读的，此监听主要处理小文件模式下用户编辑后的状态更新
