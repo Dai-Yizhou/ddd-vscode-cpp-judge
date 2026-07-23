@@ -1,0 +1,21 @@
+{
+    // VS Code 扩展调试配置
+    // 详见文档: https://code.visualstudio.com/docs/editor/debugging
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "运行扩展 (Run Extension)",
+            "type": "extensionHost",
+            "request": "launch",
+            "args": [
+                // 以 test-samples 文件夹作为扩展开发宿主的工作区
+                "${workspaceFolder}/test-samples",
+                "--extensionDevelopmentPath=${workspaceFolder}"
+            ],
+            "outFiles": [
+                "${workspaceFolder}/out/**/*.js"
+            ],
+            "preLaunchTask": "npm: compile"
+        }
+    ]
+}

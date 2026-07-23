@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Compiled TypeScript output
+out/
+
+# VS Code extension package
+*.vsix
+
+# Test artifacts (executables and generated outputs)
+test-samples/*.exe
+test-samples/*.actual.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+test-samples/down_A/seg_ex2.in
+test-samples/down_A/seg_ex2.out
+.DS_Store

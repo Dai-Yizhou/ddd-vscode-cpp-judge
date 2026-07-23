@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug C++: T1.cpp",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "/Users/a123/Library/Application Support/TRAE SOLO CN/ModularData/ai-agent/work-mode-projects/6a61cb0dced2d7a39fdcff2c/vscode-cpp-runner/test-samples/T1",
+            "args": [],
+            "stopAtEntry": false,
+            "cwd": "/Users/a123/Library/Application Support/TRAE SOLO CN/ModularData/ai-agent/work-mode-projects/6a61cb0dced2d7a39fdcff2c/vscode-cpp-runner/test-samples",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": null
+        }
+    ]
+}

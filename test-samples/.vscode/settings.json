@@ -1,0 +1,8 @@
+{
+    "cppRunner.cppStandard": "c++17",
+    "cppRunner.optimizationLevel": "-O0",
+    "cppRunner.warningFlags": [
+        "-Wall",
+        "-Wextra"
+    ]
+}

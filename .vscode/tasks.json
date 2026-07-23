@@ -1,0 +1,20 @@
+{
+    // VS Code 任务配置
+    // 详见文档: https://code.visualstudio.com/docs/editor/tasks
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "type": "npm",
+            "script": "compile",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$tsc"
+            ],
+            "label": "npm: compile",
+            "detail": "tsc -p ./"
+        }
+    ]
+}

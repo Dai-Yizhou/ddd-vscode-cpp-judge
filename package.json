@@ -1,0 +1,413 @@
+{
+  "name": "vscode-cpp-runner",
+  "displayName": "C++ Runner",
+  "description": "Compile, run and debug C++ single files with input/output management and diff comparison",
+  "version": "0.1.0",
+  "publisher": "cpp-runner",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers",
+    "Testing"
+  ],
+  "keywords": [
+    "c++",
+    "cpp",
+    "run",
+    "debug",
+    " competitive programming"
+  ],
+  "activationEvents": [
+    "onLanguage:cpp"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "cppRunner.compileAndRun",
+        "title": "Compile and Run",
+        "category": "C++ Runner",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cppRunner.debug",
+        "title": "Debug",
+        "category": "C++ Runner",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "cppRunner.setCompileOptions",
+        "title": "Set Compile Options",
+        "category": "C++ Runner"
+      },
+      {
+        "command": "cppRunner.setWarningLevel",
+        "title": "Set Warning Level",
+        "category": "C++ Runner"
+      },
+      {
+        "command": "cppRunner.loadInputFile",
+        "title": "Load Input File",
+        "category": "C++ Runner"
+      },
+      {
+        "command": "cppRunner.setExpectedOutput",
+        "title": "Set Expected Output",
+        "category": "C++ Runner"
+      },
+      {
+        "command": "cppRunner.clearInputAndExpected",
+        "title": "Clear Input / Expected Output",
+        "category": "C++ Runner"
+      },
+      {
+        "command": "cppRunner.openInputPanel",
+        "title": "Open Input Panel",
+        "category": "C++ Runner"
+      },
+      {
+        "command": "cppRunner.openRunnerPanel",
+        "title": "Open Runner Panel",
+        "category": "C++ Runner",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "cppRunner.runFromPanel",
+        "title": "Run (from Panel)",
+        "category": "C++ Runner",
+        "icon": "$(play)"
+      },
+      {
+        "command": "cppRunner.debugFromPanel",
+        "title": "Debug (from Panel)",
+        "category": "C++ Runner",
+        "icon": "$(debug-alt)"
+      },
+      {
+        "command": "cppRunner.openSettings",
+        "title": "Open Settings (UI)",
+        "category": "C++ Runner",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "cppRunner.openSettingsJson",
+        "title": "Open Settings (JSON)",
+        "category": "C++ Runner",
+        "icon": "$(json)"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "editorLangId == cpp",
+          "command": "cppRunner.compileAndRun",
+          "group": "cppRunner@1"
+        },
+        {
+          "when": "editorLangId == cpp",
+          "command": "cppRunner.debug",
+          "group": "cppRunner@2"
+        },
+        {
+          "when": "editorLangId == cpp",
+          "command": "cppRunner.loadInputFile",
+          "group": "cppRunner@3"
+        },
+        {
+          "when": "editorLangId == cpp",
+          "command": "cppRunner.setExpectedOutput",
+          "group": "cppRunner@4"
+        },
+        {
+          "when": "editorLangId == cpp",
+          "command": "cppRunner.openRunnerPanel",
+          "group": "cppRunner@5"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "cppRunner.compileAndRun",
+          "when": "editorLangId == cpp"
+        },
+        {
+          "command": "cppRunner.debug",
+          "when": "editorLangId == cpp"
+        },
+        {
+          "command": "cppRunner.runFromPanel",
+          "when": "editorLangId == cpp"
+        },
+        {
+          "command": "cppRunner.debugFromPanel",
+          "when": "editorLangId == cpp"
+        },
+        {
+          "command": "cppRunner.openRunnerPanel"
+        },
+        {
+          "command": "cppRunner.openSettings"
+        },
+        {
+          "command": "cppRunner.openSettingsJson"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "cppRunner.runFromPanel",
+          "when": "view == cppRunner.runnerView",
+          "group": "navigation@1"
+        },
+        {
+          "command": "cppRunner.debugFromPanel",
+          "when": "view == cppRunner.runnerView",
+          "group": "navigation@2"
+        },
+        {
+          "command": "cppRunner.openSettings",
+          "when": "view == cppRunner.runnerView",
+          "group": "navigation@3"
+        },
+        {
+          "command": "cppRunner.openSettingsJson",
+          "when": "view == cppRunner.runnerView",
+          "group": "navigation@4"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "cppRunnerPanel",
+          "title": "C++ Runner",
+          "icon": "$(terminal)"
+        }
+      ]
+    },
+    "views": {
+      "cppRunnerPanel": [
+        {
+          "type": "webview",
+          "id": "cppRunner.runnerView",
+          "name": "Runner"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "C++ Runner",
+      "properties": {
+        "cppRunner.compilerPath": {
+          "type": "string",
+          "default": "g++",
+          "description": "Path to the C++ compiler executable"
+        },
+        "cppRunner.cppStandard": {
+          "type": "string",
+          "default": "c++17",
+          "enum": [
+            "c++11",
+            "c++14",
+            "c++17",
+            "c++20",
+            "c++23"
+          ],
+          "description": "C++ 语言标准。注意：c++23 需要 g++ 13+ 或 clang++ 17+，若编译器不支持将自动回退到 c++2b/c++20 并提示 / C++ standard. c++23 requires g++13+/clang++17+; auto-fallback to c++2b/c++20 if unsupported."
+        },
+        "cppRunner.optimizationLevel": {
+          "type": "string",
+          "default": "-O2",
+          "enum": [
+            "-O0",
+            "-O1",
+            "-O2",
+            "-O3",
+            "-Os"
+          ],
+          "description": "Compiler optimization level"
+        },
+        "cppRunner.warningFlags": {
+          "type": "array",
+          "default": [
+            "-Wall",
+            "-Wextra"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Compiler warning flags"
+        },
+        "cppRunner.outputDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Directory for compiled executables (empty = same as source)"
+        },
+        "cppRunner.saveActualOutput": {
+          "type": "string",
+          "default": "never",
+          "enum": [
+            "always",
+            "never",
+            "ask"
+          ],
+          "description": "运行后是否保存实际输出文件。always=始终保存，never=从不保存，ask=询问（已废弃，使用设置决定）"
+        },
+        "cppRunner.performanceBaseline": {
+          "type": "string",
+          "default": "luogu",
+          "enum": [
+            "none",
+            "luogu",
+            "ccf"
+          ],
+          "enumDescriptions": [
+            "不进行性能换算 / No performance conversion",
+            "洛谷评测机: Intel Xeon Platinum 8369HC (GB6 单核 ~1472)",
+            "CCF 2025 CSP-S 最新评测机: Intel Core Ultra 9 285K (GB6 单核 ~2150)"
+          ],
+          "description": "性能换算基准评测机（使用 GeekBench 6 单核分数换算）。luogu=洛谷在线评测机(Intel Xeon Platinum 8369HC, GB6~1472)，ccf=CCF最新评测机(Intel Core Ultra 9 285K, GB6~2150，2025 CSP-S起启用)，none=不换算。数据来源: 洛谷官方 chen_zhe 2025-02-25"
+        },
+        "cppRunner.userDeviceGeekbenchScore": {
+          "type": "number",
+          "default": 0,
+          "description": "用户设备的 GeekBench 6 单核分数（手动指定）。推荐在 https://browser.geekbench.com 查询实测分数填入以获得更准确换算。设为 0 则使用自动基准测试估算（准确性有限）/ Device GB6 single-core score (0=auto-detect)"
+        },
+        "cppRunner.largeFileThreshold": {
+          "type": "number",
+          "default": 1048576,
+          "description": "File size threshold (bytes) for treating as large file"
+        },
+        "cppRunner.timeLimitHard": {
+          "type": "number",
+          "default": 60000,
+          "description": "硬时间限制（毫秒），作为系统保护：超过将强制终止并标注 TLE。软限制已移除，如需为单个程序设置题目时限请在程序内部处理 / Hard time limit (ms) as system protection; soft limit removed."
+        },
+        "cppRunner.memoryLimitHard": {
+          "type": "number",
+          "default": 4294967296,
+          "description": "硬内存限制（字节），作为系统保护：超过将强制终止并标注 MLE / Hard memory limit (bytes) as system protection."
+        },
+        "cppRunner.ignoreTrailingWhitespace": {
+          "type": "boolean",
+          "default": true,
+          "description": "忽略输出比对时的行尾空白（默认开启，严格比对时设为 false）/ Ignore trailing whitespace when comparing output (default true)"
+        },
+        "cppRunner.inputFileExtensions": {
+          "type": "array",
+          "default": ["txt", "in"],
+          "items": {
+            "type": "string"
+          },
+          "description": "输入文件支持的扩展名列表（不带前导点号）/ Supported input file extensions (without leading dot)"
+        },
+        "cppRunner.expectedOutputFileExtensions": {
+          "type": "array",
+          "default": ["txt", "out"],
+          "items": {
+            "type": "string"
+          },
+          "description": "预期输出文件支持的扩展名列表（不带前导点号）/ Supported expected output file extensions (without leading dot)"
+        },
+        "cppRunner.actualOutputExtension": {
+          "type": "string",
+          "default": "txt",
+          "enum": ["txt", "out"],
+          "description": "实际输出文件的扩展名（不带前导点号）/ Extension for actual output files (without leading dot)"
+        },
+        "cppRunner.panelRunKey": {
+          "type": "string",
+          "default": "ctrl+enter",
+          "description": "面板内触发运行的快捷键（在输入框中按下时触发运行）。格式：ctrl+shift+r / cmd+enter 等，留空则禁用 / Key to trigger run from within the panel textarea (e.g. ctrl+enter, empty to disable)"
+        }
+      }
+    },
+    "keybindings": [
+      {
+        "command": "cppRunner.runFromPanel",
+        "key": "ctrl+shift+r",
+        "mac": "cmd+shift+r",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.debugFromPanel",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.compileAndRun",
+        "key": "f6",
+        "mac": "f6",
+        "when": "editorTextFocus && editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.debug",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "editorTextFocus && editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.openRunnerPanel",
+        "key": "alt+r",
+        "mac": "alt+r",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.openInputPanel",
+        "key": "alt+i",
+        "mac": "alt+i",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.loadInputFile",
+        "key": "alt+l",
+        "mac": "alt+l",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.setExpectedOutput",
+        "key": "alt+e",
+        "mac": "alt+e",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.clearInputAndExpected",
+        "key": "alt+c",
+        "mac": "alt+c",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.setCompileOptions",
+        "key": "alt+o",
+        "mac": "alt+o",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.setWarningLevel",
+        "key": "alt+w",
+        "mac": "alt+w",
+        "when": "editorLangId == cpp"
+      },
+      {
+        "command": "cppRunner.openSettings",
+        "key": "alt+s",
+        "mac": "alt+s"
+      },
+      {
+        "command": "cppRunner.openSettingsJson",
+        "key": "alt+shift+s",
+        "mac": "alt+shift+s"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.74.0",
+    "typescript": "^5.0.0"
+  }
+}
