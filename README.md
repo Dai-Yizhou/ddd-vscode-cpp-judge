@@ -166,4 +166,7 @@ vscode-cpp-runner/
 
 ## 许可证
 
-MIT
+UNLICENSED
+
+Code by:Trae AI
+

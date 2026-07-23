@@ -31,10 +31,10 @@
 ## 性能换算
 
 - 运行后显示在目标评测机上的等效运行时间（基于 GeekBench 6 单核分数换算）。
-- 评测机参数（数据来源：洛谷官方 chen_zhe 2025-02-25：https://www.luogu.com.cn/article/f3bqyl4w或https://www.luogu.me/article/f3bqyl4w）：
+- 评测机参数（数据来源：洛谷 chen_zhe 2025-06-01：https://www.luogu.com.cn/article/f3bqyl4w 或 https://www.luogu.me/article/f3bqyl4w）：
   - 洛谷: Intel Xeon Platinum 8369HC (GB6 单核 ~1472)
   - CCF 2025 CSP-S: Intel Core Ultra 9 285K (GB6 单核 ~2150)
-    注意：CCF 曾更新评测机，2018-2024 用 i7-8700K (GB6 ~1614)，2025 CSP-S 起更换为 Core Ultra 9 285K。
+    注意：CCF 曾更新评测机，2018-2024 用 i7-8700K (GB6 ~1614)，2025 CSP-S 起更换为 Core Ultra 9 285K（数据来源：洛谷 chen_zhe 2025-02-25：https://www.luogu.com.cn/article/csoig4zt 或 https://www.luogu.me/article/csoig4zt）。
 - 推荐在设置中手动指定设备 GeekBench 6 分数以获得更准确换算（cppRunner.userDeviceGeekbenchScore）。
 - 查询设备分数：https://browser.geekbench.com
 
