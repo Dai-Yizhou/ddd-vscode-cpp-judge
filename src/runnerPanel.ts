@@ -440,7 +440,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
 <body>
     <div class="toolbar">
         <button id="runBtn" title="编译并运行 (Ctrl+Shift+R / Cmd+Shift+R)">&#9654; 运行</button>
-        <button id="debugBtn" class="secondary" title="调试 (Ctrl+Shift+D / Cmd+Shift+D)">调试</button>
+        <button id="debugBtn" class="secondary" title="调试 (Ctrl+Shift+D / Cmd+Shift+D)暂不可用">调试</button>
         <div class="sep"></div>
         <!-- 编译选项：C++ 标准 -->
         <div class="opt-group">
