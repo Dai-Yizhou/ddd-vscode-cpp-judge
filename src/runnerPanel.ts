@@ -882,7 +882,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                         resultPerformance.style.display = 'flex';
                         // 显示详情：用户分数、评测机分数、来源
                         const sourceText = pi.scoreSource === 'manual' ? '手动' : (pi.scoreSource === 'auto' ? '自动' : '未知');
-                        resultPerfDetail.textContent = '设备GB6:' + pi.userScore + ' / 评测机:' + pi.baselineScore + ' (' + sourceText + ')';
+                        resultPerfDetail.textContent = '设备GB6:' + pi.userScore + '（' + sourceText + ') ' + '/ 评测机:' + pi.baselineScore;
                         resultPerfDetail.style.display = 'flex';
                         resultPerfDetail.title = pi.baselineNote;
                     } else {
