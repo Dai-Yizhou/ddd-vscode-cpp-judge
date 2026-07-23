@@ -4,6 +4,7 @@
   "description": "Compile, run and debug C++ single files with input/output management and diff comparison",
   "version": "0.1.0",
   "publisher": "cpp-runner",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.74.0"
   },
@@ -19,6 +20,14 @@
     "debug",
     " competitive programming"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge/issues"
+  },
+  "homepage": "https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge#readme",
   "activationEvents": [
     "onLanguage:cpp"
   ],

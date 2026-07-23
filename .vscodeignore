@@ -1,10 +1,27 @@
+# 开发工具配置 / Dev tooling configs
 .vscode/**
 .vscode-test/**
+.github/**
+
+# 源码与编译配置 / Source & build configs
 src/**
-.gitignore
-.yarnrc
-vsc-extension-quickstart.md
 **/tsconfig.json
 **/.eslintrc.json
 **/*.map
 **/*.ts
+
+# Git / 版本控制 / Version control
+.gitignore
+.gitattributes
+.git/**
+
+# 测试样例（无需分发给最终用户）/ Test samples (not needed by end users)
+test-samples/**
+
+# 其他 / Other
+.yarnrc
+vsc-extension-quickstart.md
+*.md
+!README.md
+!docs/panel-help.md
+!LICENSE
