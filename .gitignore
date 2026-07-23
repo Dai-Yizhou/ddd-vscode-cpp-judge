@@ -8,8 +8,7 @@ out/
 *.vsix
 
 # Test artifacts (executables and generated outputs)
-test-samples/*.exe
-test-samples/*.actual.*
+test-samples/
 
 # OS files
 .DS_Store
