@@ -23,5 +23,9 @@ test-samples/**
 vsc-extension-quickstart.md
 *.md
 !README.md
-!docs/panel-help.md
+!README-en-US.md
+!CHANGELOG.md
+!docs/panel-help-zh-CN.md
+!docs/panel-help-en-US.md
+!docs/TECHNICAL.md
 !LICENSE

@@ -24,6 +24,7 @@ import { WebviewInputPanel } from './webviewInputPanel';
 import { RunnerPanelProvider, TestCaseResult } from './runnerPanel';
 import { getPerformanceInfo } from './performanceCalculator';
 import { detectFileIo, resolveFileIoPath } from './fileIoDetector';
+import { setLocale, getStrings, LocaleCode } from './locale';
 
 let outputChannel: vscode.OutputChannel;
 let configManager: ConfigManager;
@@ -74,6 +75,10 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.commands.registerCommand('cppRunner.debugFromPanel', () => {
             runnerPanelProvider?.triggerDebug();
         }),
+        // 在运行面板中显示帮助
+        vscode.commands.registerCommand('cppRunner.helpFromPanel', () => {
+            runnerPanelProvider?.showHelp();
+        }),
         // 设置编译选项（标准、优化级别等）
         vscode.commands.registerCommand('cppRunner.setCompileOptions', setCompileOptions),
         // 设置警告级别
@@ -104,6 +109,9 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('cppRunner.runnerView', runnerPanelProvider)
     );
+
+    // 注册面板回调（在 activate 中注册，确保通过活动栏图标打开面板时回调也可用）
+    registerPanelCallbacks();
 }
 
 /**
@@ -129,13 +137,16 @@ export function deactivate() {}
 async function compileAndRun() {
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.languageId !== 'cpp') {
-        // 未打开 C++ 文件时提示用户
-        // Prompt user when no C++ file is open
         vscode.window.showWarningMessage('Please open a C++ file first.');
         return;
     }
 
     const sourceFile = editor.document.fileName;
+
+    if (editor.document.isDirty) {
+        await editor.document.save();
+    }
+
     const inputFile = inputManager.getInputFile(sourceFile);
 
     // 清空并显示 OutputChannel，准备输出本次运行日志
@@ -413,10 +424,10 @@ async function openInputPanel() {
 }
 
 /**
- * 打开可视化运行面板（底部栏）
- * Opens the visual runner panel in the bottom panel area.
+ * 打开可视化运行面板
+ * Opens the visual runner panel.
  *
- * 使用 WebviewViewProvider 将面板注册到 VS Code 底部栏，
+ * 使用 WebviewViewProvider 将面板注册到 VS Code 侧边栏，
  * 用户可在面板内直接编辑输入和预期输出，点击"运行"按钮触发编译运行，
  * 运行结果（时间、内存、状态、差异）实时展示在面板中。
  */
@@ -428,15 +439,30 @@ async function openRunnerPanel() {
     }
 
     const sourceFile = editor.document.fileName;
-    // 使用 path.basename 跨平台提取文件名（Windows 用 \，Unix 用 /）
-    // Use path.basename for cross-platform filename extraction
     const fileName = path.basename(sourceFile);
 
-    // 确保底部面板可见
-    vscode.commands.executeCommand('workbench.view.extension.cppRunnerPanel');
-
-    // 显示当前编译目标文件名
+    // 存储完整路径供回调使用
+    runnerPanelProvider?.setSourceFilePath(sourceFile);
     runnerPanelProvider?.setSourceFile(fileName);
+
+    // 确保面板可见并聚焦（直接使用 WebviewView API，避免 executeCommand 不可靠）
+    if (runnerPanelProvider?.isReady()) {
+        runnerPanelProvider.show();
+    } else {
+        // 视图尚未创建时，使用正确的命令 ID 打开视图
+        // 命令格式: workbench.view.extension.<完整视图ID>
+        vscode.commands.executeCommand('workbench.view.extension.cppRunner.runnerView');
+    }
+
+    // 检测 VS Code 语言设置并发送到面板
+    try {
+        const vscodeLocale = vscode.env.language;
+        const locale: LocaleCode = vscodeLocale.startsWith('zh') ? 'zh-CN' : 'en-US';
+        setLocale(locale);
+        runnerPanelProvider?.setLocale(locale, getStrings());
+    } catch {
+        // locale 模块加载失败时使用 RunnerPanelProvider 内部的硬编码字符串
+    }
 
     // 发送当前编译选项到面板
     runnerPanelProvider?.sendCompileOptions({
@@ -446,41 +472,48 @@ async function openRunnerPanel() {
         warningFlags: configManager.getWarningFlags(),
     });
 
-    // 加载已有的输入和预期输出数据并发送到面板
-    const existingInput = inputManager.getInputContent(sourceFile);
-    const expectedOutput = expectedOutputManager.getExpectedOutput(sourceFile);
-    runnerPanelProvider?.setInitialData(existingInput || '', expectedOutput || '');
-
-    // 从 docs/panel-help.md 读取帮助文档并发送到面板（避免硬编码）
-    try {
-        const helpPath = path.join(extensionContext.extensionPath, 'docs', 'panel-help.md');
-        const helpContent = fs.readFileSync(helpPath, 'utf-8');
-        runnerPanelProvider?.setHelpContent(helpContent);
-    } catch {
-        runnerPanelProvider?.setHelpContent('# 帮助文档加载失败\n\n请确认 docs/panel-help.md 文件存在。');
-    }
-
     // 发送面板内运行快捷键设置到 Webview
     const panelRunKey = vscode.workspace.getConfiguration('cppRunner').get<string>('panelRunKey', 'ctrl+enter');
     runnerPanelProvider?.setPanelRunKey(panelRunKey || '');
 
+    // 发送控件显示配置到 Webview
+    const showControls = vscode.workspace.getConfiguration('cppRunner').get<string[]>('showControls', []);
+    runnerPanelProvider?.setShowControls(showControls);
+
+    // 从 docs/ 读取对应语言的帮助文档并发送到面板
+    try {
+        const locale = vscode.env.language.startsWith('zh') ? 'zh-CN' : 'en-US';
+        const helpFileName = locale === 'zh-CN' ? 'panel-help-zh-CN.md' : 'panel-help-en-US.md';
+        const helpPath = path.join(extensionContext.extensionPath, 'docs', helpFileName);
+        let helpContent: string;
+        if (fs.existsSync(helpPath)) {
+            helpContent = fs.readFileSync(helpPath, 'utf-8');
+        } else {
+            // 回退到通用帮助文档
+            const fallbackPath = path.join(extensionContext.extensionPath, 'docs', 'panel-help.md');
+            helpContent = fs.existsSync(fallbackPath) ? fs.readFileSync(fallbackPath, 'utf-8') : '# 帮助文档加载失败';
+        }
+        runnerPanelProvider?.setHelpContent(helpContent);
+    } catch {
+        runnerPanelProvider?.setHelpContent('# 帮助文档加载失败\n\n请确认 docs/ 目录下的帮助文档存在。');
+    }
+}
+
+/**
+ * 注册面板回调（在 activate 中调用，确保通过活动栏图标打开面板时回调也可用）
+ */
+function registerPanelCallbacks() {
     // 注册"载入文件"回调：支持点击按钮（打开文件选择器）和拖拽文件（直接读取路径）
     runnerPanelProvider?.onLoadFile(async (target: 'input' | 'expected', fileUri?: string) => {
         let filePath: string;
 
         if (fileUri) {
             // 拖拽文件：从 fileUri 解析文件路径
-            // fileUri 可能是 file:/// URI 或纯路径字符串
             if (fileUri.startsWith('file://')) {
                 try {
-                    // 使用 vscode.Uri.parse 正确解析所有平台的 file URI
-                    // Windows: file:///C:/path → C:\path
-                    // Unix: file:///path → /path
                     const uri = vscode.Uri.parse(fileUri);
                     filePath = uri.fsPath;
                 } catch {
-                    // URI 解析失败时回退：去掉 file:/// 或 file:// 前缀
-                    // Fallback: strip file:/// or file:// prefix
                     filePath = fileUri.replace(/^file:\/{2,3}/, '');
                 }
             } else {
@@ -499,12 +532,10 @@ async function openRunnerPanel() {
             filePath = uris[0].fsPath;
         }
 
-        // 使用 path.basename 跨平台提取文件名
         const fileName = path.basename(filePath);
         try {
             const stats = fs.statSync(filePath);
             // 大文件（>1MB）：只读取前 64KB 作为预览，运行时从文件流式读取完整内容
-            // 避免 50MB 文件一次性加载到 textarea 导致面板卡顿
             if (stats.size > 1024 * 1024) {
                 const previewSize = 64 * 1024;
                 const fd = fs.openSync(filePath, 'r');
@@ -532,6 +563,18 @@ async function openRunnerPanel() {
 
     // 注册运行回调（含软限制参数和大文件路径）
     runnerPanelProvider?.onRun(async (input: string, expected: string, softLimits?: { timeMs: number; memoryMB: number }, inputFilePath?: string, expectedFilePath?: string) => {
+        const sourceFile = runnerPanelProvider?.getSourceFilePath();
+        if (!sourceFile) {
+            vscode.window.showWarningMessage('请先通过快捷键或命令面板打开运行面板 / Please open the runner panel first.');
+            return;
+        }
+
+        // 自动保存：若当前活动编辑器是目标 C++ 文件且未保存，先保存
+        const activeEditor = vscode.window.activeTextEditor;
+        if (activeEditor && activeEditor.document.fileName === sourceFile && activeEditor.document.isDirty) {
+            await activeEditor.document.save();
+        }
+
         // 保存用户在面板中编辑的输入（大文件模式下 input 为空，使用文件路径）
         if (inputFilePath) {
             inputManager.setInputFile(sourceFile, inputFilePath);
@@ -549,31 +592,25 @@ async function openRunnerPanel() {
             return;
         }
 
-        // 文件 I/O 检测：检测源程序是否使用了 freopen/fopen/fstream
-        // 若使用文件 I/O，则将面板输入写入程序期望的输入文件，运行后从输出文件读取结果
+        // 文件 I/O 检测
         const fileIoInfo = detectFileIo(sourceFile);
         let stdinInputFile: string | undefined;
         let fileOutputPath: string | undefined;
 
         if (fileIoInfo.hasFileIo) {
-            // 若检测到输入文件，将输入内容写入该文件
             if (fileIoInfo.inputFile) {
                 const targetInputPath = resolveFileIoPath(sourceFile, fileIoInfo.inputFile);
                 if (inputFilePath) {
-                    // 大文件：直接复制文件，避免一次性读取到内存
                     fs.copyFileSync(inputFilePath, targetInputPath);
                 } else if (input.trim()) {
                     fs.writeFileSync(targetInputPath, input);
                 }
                 stdinInputFile = undefined;
             }
-            // 记录输出文件路径，运行后读取
             if (fileIoInfo.outputFile) {
                 fileOutputPath = resolveFileIoPath(sourceFile, fileIoInfo.outputFile);
             }
         } else {
-            // 无文件 I/O：通过 stdin 管道传入输入
-            // 大文件模式下直接用文件路径作为 stdin 源（Runner 内部用 createReadStream 流式读取）
             if (inputFilePath) {
                 stdinInputFile = inputFilePath;
             } else {
@@ -581,7 +618,7 @@ async function openRunnerPanel() {
             }
         }
 
-        // 运行阶段（传入面板上设置的软限制）
+        // 运行阶段
         const runOptions = softLimits && (softLimits.timeMs > 0 || softLimits.memoryMB > 0) ? {
             softTimeLimitMs: softLimits.timeMs > 0 ? softLimits.timeMs : undefined,
             softMemoryLimitBytes: softLimits.memoryMB > 0 ? softLimits.memoryMB * 1024 * 1024 : undefined,
@@ -592,8 +629,7 @@ async function openRunnerPanel() {
         let actualOutput = runResult.stdout;
         if (fileOutputPath && fs.existsSync(fileOutputPath)) {
             try {
-                const fileContent = fs.readFileSync(fileOutputPath, 'utf-8');
-                actualOutput = fileContent;
+                actualOutput = fs.readFileSync(fileOutputPath, 'utf-8');
             } catch {
                 // 读取失败时回退到 stdout
             }
@@ -602,11 +638,10 @@ async function openRunnerPanel() {
         // 运行后清理可执行文件
         try { fs.unlinkSync(compileResult.executablePath); } catch {}
 
-        // 比对阶段：内存中字符串比对，不产生临时文件
+        // 比对阶段
         let match: boolean | undefined;
         let diffSummary: string | undefined;
 
-        // 大文件预期输出：从文件完整读取（50MB 可接受内存占用）
         const expectedContent = expectedFilePath ? fs.readFileSync(expectedFilePath, 'utf-8') : expected;
         if (expectedContent.trim()) {
             const diff = DiffUtil.compareStringOutputs(
@@ -620,7 +655,7 @@ async function openRunnerPanel() {
             }
         }
 
-        // 性能换算（使用 GeekBench 6 单核分数，支持用户手动指定设备分数）
+        // 性能换算
         const baseline = configManager.getPerformanceBaseline();
         const userScore = configManager.getUserDeviceGeekbenchScore();
         const performanceInfo = baseline !== 'none' && runResult.timeMs !== undefined
@@ -646,7 +681,6 @@ async function openRunnerPanel() {
 
         outputChannel.clear();
         outputChannel.appendLine(`=== C++ Runner: ${sourceFile} ===\n`);
-        // 文件 I/O 模式下 stdout 可能不含实际输出，用 actualOutput 替代显示
         const displayResult = { ...runResult, stdout: actualOutput };
         displayRunResult(displayResult);
 
@@ -657,6 +691,9 @@ async function openRunnerPanel() {
 
     // 注册调试回调
     runnerPanelProvider?.onDebug(async () => {
-        await debuggerManager.debug(sourceFile);
+        const sourceFile = runnerPanelProvider?.getSourceFilePath();
+        if (sourceFile) {
+            await debuggerManager.debug(sourceFile);
+        }
     });
 }
