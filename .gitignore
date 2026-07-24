@@ -16,6 +16,4 @@ Thumbs.db
 
 # Logs
 *.log
-test-samples/down_A/seg_ex2.in
-test-samples/down_A/seg_ex2.out
 .DS_Store
