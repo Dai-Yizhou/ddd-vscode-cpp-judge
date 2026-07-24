@@ -19,6 +19,8 @@ import { ConfigManager } from './configManager';
 export interface PerformanceInfo {
     actualTimeMs: number;
     convertedTimeMs: number;
+    /** 目标评测机标识键（用于前端本地化） */
+    baselineKey: string;
     baselineName: string;
     baselineCpu: string;
     userScore: number;
@@ -75,6 +77,18 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
     private onCompileOptionsChangeCallback: ((opts: { cppStandard: string; optimizationLevel: string; warningFlags: string[] }) => void) | undefined;
     private pendingMessages: any[] = [];
 
+    /** 当前源文件完整路径（回调中使用） */
+    private sourceFilePath: string | undefined;
+
+    /** 持久化状态：在 Webview 重建时自动重新应用 */
+    private lastFileName: string | undefined;
+    private lastLocale: { locale: string; strings: any } | undefined;
+    private lastCompileOptions: CompileOptionsInfo | undefined;
+    private lastInitialData: { input: string; expected: string } | undefined;
+    private lastPanelRunKey: string | undefined;
+    private lastShowControls: string[] | undefined;
+    private lastHelpContent: string | undefined;
+
     static getInstance(): RunnerPanelProvider {
         return RunnerPanelProvider.instance;
     }
@@ -86,8 +100,6 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
 
     resolveWebviewView(webviewView: vscode.WebviewView) {
         this.view = webviewView;
-        // enableScripts: 允许 Webview 内 JavaScript 执行
-        // enableForms: 改善拖拽和表单交互兼容性
         this.view.webview.options = { enableScripts: true, enableForms: true };
         this.view.webview.html = this.getHtml();
 
@@ -95,15 +107,132 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             this.handleMessage(message);
         });
 
-        // 发送所有积压的消息
         for (const msg of this.pendingMessages) {
             this.view.webview.postMessage(msg);
         }
         this.pendingMessages = [];
+
+        // Webview 重建后重新应用所有持久化状态
+        if (this.lastFileName !== undefined) {
+            this.post({ command: 'sourceFile', fileName: this.lastFileName });
+        }
+
+        if (!this.lastLocale) {
+            const vscodeLocale = vscode.env.language;
+            const locale = vscodeLocale.startsWith('zh') ? 'zh-CN' : 'en-US';
+            const strings = this.loadLocaleStrings(locale);
+            this.lastLocale = { locale, strings };
+            this.post({ command: 'locale', locale, strings });
+        } else {
+            this.post({ command: 'locale', locale: this.lastLocale.locale, strings: this.lastLocale.strings });
+        }
+
+        if (!this.lastCompileOptions) {
+            this.lastCompileOptions = {
+                compilerPath: this.configManager.getCompilerPath(),
+                cppStandard: this.configManager.getCppStandard(),
+                optimizationLevel: this.configManager.getOptimizationLevel(),
+                warningFlags: this.configManager.getWarningFlags(),
+            };
+            this.post({ command: 'compileOptions', opts: this.lastCompileOptions });
+        } else {
+            this.post({ command: 'compileOptions', opts: this.lastCompileOptions });
+        }
+
+        if (this.lastInitialData) { this.post({ command: 'initData', input: this.lastInitialData.input, expected: this.lastInitialData.expected }); }
+
+        if (this.lastPanelRunKey === undefined) {
+            this.lastPanelRunKey = vscode.workspace.getConfiguration('cppRunner').get<string>('panelRunKey', 'ctrl+enter') || '';
+            this.post({ command: 'panelRunKey', key: this.lastPanelRunKey });
+        } else {
+            this.post({ command: 'panelRunKey', key: this.lastPanelRunKey });
+        }
+
+        if (!this.lastShowControls) {
+            this.lastShowControls = vscode.workspace.getConfiguration('cppRunner').get<string[]>('showControls', []);
+            this.post({ command: 'showControls', controls: this.lastShowControls });
+        } else {
+            this.post({ command: 'showControls', controls: this.lastShowControls });
+        }
+
+        if (this.lastHelpContent === undefined) {
+            // 帮助文档将在 openRunnerPanel 中通过 fs.readFileSync 加载并发送
+            // 此处不主动加载，避免异步问题
+        } else {
+            this.post({ command: 'helpContent', markdown: this.lastHelpContent });
+        }
+    }
+
+    /** 打开并聚焦面板 */
+    show() {
+        this.view?.show(false);
     }
 
     isReady(): boolean {
         return this.view !== undefined;
+    }
+
+    private loadLocaleStrings(locale: string): any {
+        if (locale.startsWith('zh')) {
+            return {
+                run: "运行", runTitle: "编译并运行", cppStandard: "标准", cppStandardTitle: "C++ 语言标准",
+                optimizationLevel: "优化", optimizationLevelTitle: "编译优化级别",
+                warningLevel: "警告", warningLevelTitle: "编译器警告级别",
+                softTimeLimit: "软时限", softTimeLimitTitle: "软时间限制 (ms)，0 = 不限",
+                softMemoryLimit: "软内存", softMemoryLimitTitle: "软内存限制 (MB)，0 = 不限",
+                help: "说明", helpTitle: "查看使用说明", settings: "设置", settingsTitle: "打开设置页面",
+                ready: "就绪", running: "运行中", input: "输入", inputPlaceholder: "输入数据，或拖拽文件到此处...",
+                expectedOutput: "预期", expectedPlaceholder: "预期输出...", actualOutput: "实际",
+                output: "输出", diff: "差异", stderr: "stderr", status: "状态",
+                time: "时间", memory: "内存", exitCode: "退出码", match: "比对",
+                deviceGB6: "设备GB6", judgeMachine: "评测机",
+                baselineLuogu: "洛谷评测机", baselineCcf: "CCF评测机",
+                loading: "正在载入...", loadingFail: "读取失败",
+                largeFilePreview: "大文件预览，运行时完整读取",
+                auto: "自动", manual: "手动", unknown: "未知",
+                loadInput: "载入文件", loadInputTitle: "从文件载入输入",
+                loadExpected: "载入文件", loadExpectedTitle: "从文件载入预期输出",
+                clearFile: "\u2715", clearFileTitle: "移除已加载的文件",
+                diffPlaceholder: "差异比对...", noStderr: "无 stderr", noOutput: "无输出",
+                outputPlaceholder: "输出...", helpTitleModal: "C++ Runner 使用说明",
+                close: "关闭", saveActualOutput: "保存实际输出", saveActualOutputTitle: "保存实际输出到文件",
+                ac: "AC", wa: "WA", re: "RE", tle: "TLE", mle: "MLE", ce: "CE",
+                compileError: "编译失败", runningElipsis: "运行中...",
+                matchOk: "输出与预期完全匹配", matchSkip: "未设置预期输出，跳过比对",
+                dropInput: "松开以加载输入文件", dropExpected: "松开以加载预期输出文件",
+                dropUnknown: "无法识别拖拽内容", fileIo: "文件I/O",
+                helpLoading: "加载中...", helpClose: "关闭",
+            };
+        }
+        return {
+            run: "Run", runTitle: "Compile & Run", cppStandard: "Std", cppStandardTitle: "C++ Language Standard",
+            optimizationLevel: "Opt", optimizationLevelTitle: "Compiler Optimization Level",
+            warningLevel: "Warn", warningLevelTitle: "Compiler Warning Level",
+            softTimeLimit: "Time", softTimeLimitTitle: "Soft time limit (ms), 0 = unlimited",
+            softMemoryLimit: "Mem", softMemoryLimitTitle: "Soft memory limit (MB), 0 = unlimited",
+            help: "Help", helpTitle: "Show usage guide", settings: "Settings", settingsTitle: "Open settings",
+            ready: "Ready", running: "Running", input: "Input", inputPlaceholder: "Enter input, or drop files here...",
+            expectedOutput: "Expected", expectedPlaceholder: "Expected output...", actualOutput: "Actual",
+            output: "Output", diff: "Diff", stderr: "Err", status: "Status",
+            time: "Time", memory: "Memory", exitCode: "Exit", match: "Match",
+            deviceGB6: "Device GB6", judgeMachine: "Judge",
+            baselineLuogu: "Luogu Judge", baselineCcf: "CCF Judge",
+            loading: "Loading...", loadingFail: "Read failed",
+            largeFilePreview: "Large file preview",
+            auto: "auto", manual: "manual", unknown: "unknown",
+            loadInput: "Load File", loadInputTitle: "Load input from file",
+            loadExpected: "Load File", loadExpectedTitle: "Load expected output from file",
+            clearFile: "\u2715", clearFileTitle: "Remove loaded file",
+            diffPlaceholder: "Diff...", noStderr: "No stderr", noOutput: "No output",
+            outputPlaceholder: "Output...", helpTitleModal: "C++ Runner Help",
+            close: "Close", saveActualOutput: "Save Output", saveActualOutputTitle: "Save actual output to file",
+            ac: "AC", wa: "WA", re: "RE", tle: "TLE", mle: "MLE", ce: "CE",
+            compileError: "Compile failed", runningElipsis: "Running...",
+            matchOk: "Output matches expected exactly", matchSkip: "No expected output set, skipping comparison",
+            dropInput: "Release to load input file", dropExpected: "Release to load expected output file",
+            dropUnknown: "Unrecognized content", fileIo: "File I/O",
+            helpLoading: "Loading...", helpClose: "Close",
+        };
     }
 
     onRun(callback: (input: string, expected: string, softLimits?: { timeMs: number; memoryMB: number }, inputFilePath?: string, expectedFilePath?: string) => void) {
@@ -121,6 +250,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
 
     /** 发送当前编译选项到面板 */
     sendCompileOptions(opts: CompileOptionsInfo) {
+        this.lastCompileOptions = opts;
         this.post({ command: 'compileOptions', opts });
     }
 
@@ -159,23 +289,54 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         this.onDebugCallback?.();
     }
 
+    /** 由外部命令（标题栏按钮）显示帮助模态框 */
+    showHelp() {
+        this.post({ command: 'showHelp' });
+    }
+
     setInitialData(input: string, expected: string) {
+        this.lastInitialData = { input, expected };
         this.post({ command: 'initData', input, expected });
     }
 
     /** 设置当前正在编译的源文件名 */
     setSourceFile(fileName: string) {
-        this.post({ command: 'setSourceFile', fileName });
+        this.lastFileName = fileName || '';
+        this.post({ command: 'sourceFile', fileName: this.lastFileName });
+    }
+
+    /** 设置当前源文件完整路径（回调中使用） */
+    setSourceFilePath(filePath: string) {
+        this.sourceFilePath = filePath;
+    }
+
+    /** 获取当前源文件完整路径 */
+    getSourceFilePath(): string | undefined {
+        return this.sourceFilePath;
     }
 
     /** 发送帮助文档内容到面板（从 docs/panel-help.md 读取） */
     setHelpContent(markdown: string) {
+        this.lastHelpContent = markdown;
         this.post({ command: 'helpContent', markdown });
     }
 
     /** 发送面板内运行快捷键设置到 Webview */
     setPanelRunKey(key: string) {
+        this.lastPanelRunKey = key;
         this.post({ command: 'panelRunKey', key });
+    }
+
+    /** 发送语言设置到 Webview */
+    setLocale(locale: string, strings: any) {
+        this.lastLocale = { locale, strings };
+        this.post({ command: 'locale', locale, strings });
+    }
+
+    /** 发送控件显示配置到 Webview */
+    setShowControls(controls: string[]) {
+        this.lastShowControls = controls;
+        this.post({ command: 'showControls', controls });
     }
 
     showCompileError(stderr: string) {
@@ -276,17 +437,28 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             color: var(--vscode-button-foreground);
             border: none; border-radius: 3px; cursor: pointer;
             font-size: 12px; font-family: var(--vscode-font-family);
+            white-space: nowrap;
         }
         .toolbar button:hover { background-color: var(--vscode-button-hoverBackground); }
         .toolbar button:disabled { opacity: 0.5; cursor: not-allowed; }
         .toolbar button.secondary {
             background-color: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
+            font-size: 12px;
+            padding: 3px 10px;
         }
         .toolbar button.secondary:hover {
             background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground));
         }
         .toolbar .spacer { flex: 1; }
+        /* 窄面板响应式：隐藏标签文字和按钮文字，仅保留图标 */
+        @media (max-width: 560px) {
+            .opt-label { display: none !important; }
+            .toolbar { gap: 3px; padding: 4px 6px; }
+            .toolbar button { padding: 4px 6px; }
+            .toolbar button .btn-text { display: none; }
+            .limit-input { width: 44px; }
+        }
         .source-file {
             font-size: 11px; color: var(--vscode-descriptionForeground);
             margin-right: 8px;
@@ -328,16 +500,17 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         }
         .status-idle { background-color: var(--vscode-badge-background); color: var(--vscode-badge-foreground); }
         .status-running { background-color: var(--vscode-progressBar-background); color: #fff; }
-        .status-ok { background-color: rgba(76,175,80,.2); color: #4caf50; border: 1px solid #4caf50; }
-        .status-re { background-color: rgba(244,67,54,.2); color: #f44336; border: 1px solid #f44336; }
-        .status-tle { background-color: rgba(255,152,0,.2); color: #ff9800; border: 1px solid #ff9800; }
-        .status-mle { background-color: rgba(156,39,176,.2); color: #9c27b0; border: 1px solid #9c27b0; }
-        .status-warn { background-color: rgba(255,193,7,.2); color: #ffc107; border: 1px solid #ffc107; }
+        .status-ac { background-color: rgba(82,196,26,.2); color: #52C41A; border: 1px solid #52C41A; }
+        .status-wa { background-color: rgba(231,76,60,.2); color: #E74C3C; border: 1px solid #E74C3C; }
+        .status-re { background-color: rgba(157,61,207,.2); color: #9D3DCF; border: 1px solid #9D3DCF; }
+        .status-tle { background-color: rgba(5,34,66,.15); color: #052242; border: 1px solid #052242; }
+        .status-mle { background-color: rgba(5,34,66,.15); color: #052242; border: 1px solid #052242; }
+        .status-ce { background-color: rgba(250,219,20,.2); color: #FADB14; border: 1px solid #FADB14; }
 
-        .main-content { display: flex; flex: 1; overflow: hidden; }
+        .main-content { display: flex; flex: 1; overflow-x: auto; overflow-y: hidden; }
         .column {
             flex: 1; display: flex; flex-direction: column;
-            min-width: 0; border-right: 1px solid var(--vscode-panel-border);
+            min-width: 180px; border-right: 1px solid var(--vscode-panel-border);
         }
         .column:last-child { border-right: none; }
         .column-header {
@@ -346,6 +519,9 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             border-bottom: 1px solid var(--vscode-panel-border);
             font-size: 11px; font-weight: 600; color: var(--vscode-foreground);
             text-transform: uppercase; letter-spacing: .5px; flex-shrink: 0;
+        }
+        .column-header .header-actions {
+            display: flex; align-items: center; gap: 4px;
         }
         .column-header .file-hint {
             font-weight: 400; color: var(--vscode-descriptionForeground);
@@ -359,6 +535,9 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         }
         .column-header .load-btn:hover {
             background-color: var(--vscode-button-secondaryHoverBackground, var(--vscode-button-secondaryBackground));
+        }
+        .column-header .clear-btn {
+            color: #E74C3C; font-weight: 700; padding: 1px 5px;
         }
         .editor-area {
             flex: 1; display: flex; flex-direction: column;
@@ -400,7 +579,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         /* stderr 徽章：有 stderr 输出时显示红色感叹号 */
         .tab .stderr-badge {
             display: none;
-            background-color: #f44336; color: #fff;
+            background-color: #E74C3C; color: #fff;
             font-size: 9px; font-weight: 700;
             width: 14px; height: 14px; line-height: 14px;
             border-radius: 50%; text-align: center;
@@ -415,13 +594,14 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             padding: 6px; line-height: 1.4;
         }
         .diff-line { white-space: pre-wrap; word-break: break-all; padding: 0 4px; }
-        .diff-line.diff-expected { background-color: rgba(244,67,54,.1); border-left: 3px solid #f44336; }
-        .diff-line.diff-actual { background-color: rgba(76,175,80,.1); border-left: 3px solid #4caf50; }
+        .diff-line.diff-expected { background-color: rgba(231,76,60,.1); border-left: 3px solid #E74C3C; }
+        .diff-line.diff-actual { background-color: rgba(82,196,26,.1); border-left: 3px solid #52C41A; }
         .result-bar {
-            display: flex; align-items: center; gap: 16px;
+            display: flex; align-items: center; gap: 10px;
             padding: 4px 10px;
             border-top: 1px solid var(--vscode-panel-border);
-            font-size: 11px; flex-shrink: 0; min-height: 26px;
+            font-size: 11px; flex-shrink: 0;
+            flex-wrap: wrap;
         }
         .result-item { display: flex; align-items: center; gap: 3px; }
         .result-item .label { color: var(--vscode-descriptionForeground); }
@@ -439,13 +619,11 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
     <div class="toolbar">
-        <button id="runBtn" title="编译并运行 (Ctrl+Shift+R / Cmd+Shift+R)">&#9654; 运行</button>
-        <button id="debugBtn" class="secondary" title="调试 (Ctrl+Shift+D / Cmd+Shift+D)暂不可用">调试</button>
+        <button id="runBtn" data-i18n-title="runTitle">&#9654; <span class="btn-text" data-i18n="run">Run</span></button>
         <div class="sep"></div>
-        <!-- 编译选项：C++ 标准 -->
-        <div class="opt-group">
-            <span class="opt-label">标准</span>
-            <select id="cppStandardSelect" title="C++ 标准">
+        <div class="opt-group" id="cppStandardGroup">
+            <span class="opt-label" data-i18n="cppStandard" data-i18n-title="cppStandardTitle">Std</span>
+            <select id="cppStandardSelect" data-i18n-title="cppStandardTitle">
                 <option value="c++11">c++11</option>
                 <option value="c++14">c++14</option>
                 <option value="c++17">c++17</option>
@@ -453,10 +631,9 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 <option value="c++23">c++23</option>
             </select>
         </div>
-        <!-- 编译选项：优化级别 -->
-        <div class="opt-group">
-            <span class="opt-label">优化</span>
-            <select id="optLevelSelect" title="优化级别">
+        <div class="opt-group" id="optLevelGroup">
+            <span class="opt-label" data-i18n="optimizationLevel" data-i18n-title="optimizationLevelTitle">Opt</span>
+            <select id="optLevelSelect" data-i18n-title="optimizationLevelTitle">
                 <option value="-O0">-O0</option>
                 <option value="-O1">-O1</option>
                 <option value="-O2">-O2</option>
@@ -464,10 +641,9 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 <option value="-Os">-Os</option>
             </select>
         </div>
-        <!-- 编译选项：警告级别 -->
-        <div class="opt-group">
-            <span class="opt-label">警告</span>
-            <select id="warningLevelSelect" title="警告级别">
+        <div class="opt-group" id="warningLevelGroup">
+            <span class="opt-label" data-i18n="warningLevel" data-i18n-title="warningLevelTitle">Warn</span>
+            <select id="warningLevelSelect" data-i18n-title="warningLevelTitle">
                 <option value="none">none</option>
                 <option value="-Wall">-Wall</option>
                 <option value="-Wall -Wextra">-Wall -Wextra</option>
@@ -477,99 +653,99 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             </select>
         </div>
         <div class="sep"></div>
-        <!-- 软限制：时间 (ms) 和内存 (MB)，0 表示不限 -->
-        <div class="opt-group">
-            <span class="opt-label" title="软时间限制 (ms)，0 = 不限">软时限</span>
-            <input type="number" class="limit-input" id="softTimeLimit" value="0" min="0" title="软时间限制 (ms)，0 = 不限" />
+        <div class="opt-group" id="softTimeLimitGroup">
+            <span class="opt-label" data-i18n="softTimeLimit" data-i18n-title="softTimeLimitTitle">Time</span>
+            <input type="number" class="limit-input" id="softTimeLimit" value="0" min="0" data-i18n-title="softTimeLimitTitle" />
         </div>
-        <div class="opt-group">
-            <span class="opt-label" title="软内存限制 (MB)，0 = 不限">软内存</span>
-            <input type="number" class="limit-input" id="softMemLimit" value="0" min="0" title="软内存限制 (MB)，0 = 不限" />
+        <div class="opt-group" id="softMemLimitGroup">
+            <span class="opt-label" data-i18n="softMemoryLimit" data-i18n-title="softMemoryLimitTitle">Mem</span>
+            <input type="number" class="limit-input" id="softMemLimit" value="0" min="0" data-i18n-title="softMemoryLimitTitle" />
         </div>
         <div class="spacer"></div>
-        <span class="source-file" id="sourceFileHint"></span>
-        <button id="helpBtn" class="secondary" title="查看使用说明 (Alt+H)">说明</button>
-        <button id="settingsBtn" class="secondary" title="打开设置页面 (Alt+S)">设置</button>
-        <button id="settingsJsonBtn" class="secondary" title="打开 settings.json 配置文件 (Alt+Shift+S)">JSON</button>
-        <span id="statusBadge" class="status-badge status-idle">就绪</span>
+        <span id="statusBadge" class="status-badge status-idle" data-i18n="ready">Ready</span>
     </div>
 
     <div class="main-content">
         <div class="column">
             <div class="column-header">
-                <span>输入 (stdin)</span>
-                <button class="load-btn" id="loadInputBtn" title="从文件载入输入（支持大文件）">载入文件</button>
-                <span class="file-hint" id="inputFileHint"></span>
+                <span data-i18n="input">Input</span>
+                <div class="header-actions">
+                    <button class="load-btn" id="loadInputBtn" data-i18n="loadInput" data-i18n-title="loadInputTitle">...</button>
+                    <button class="load-btn clear-btn" id="clearInputBtn" data-i18n="clearFile" data-i18n-title="clearFileTitle" style="display:none;">&#10005;</button>
+                    <span class="file-hint" id="inputFileHint"></span>
+                </div>
             </div>
             <div class="editor-area" id="inputArea">
-                <textarea id="inputEditor" placeholder="输入数据，或拖拽 .in/.txt 文件到此处..." spellcheck="false"></textarea>
-                <div class="drop-overlay" id="inputDropOverlay">松开以加载输入文件</div>
+                <textarea id="inputEditor" data-i18n-placeholder="inputPlaceholder" placeholder="Enter input..." spellcheck="false"></textarea>
+                <div class="drop-overlay" id="inputDropOverlay" data-i18n="dropInput">Drop input file</div>
             </div>
         </div>
         <div class="column">
             <div class="column-header">
-                <span>预期输出</span>
-                <button class="load-btn" id="loadExpectedBtn" title="从文件载入预期输出（支持大文件）">载入文件</button>
-                <span class="file-hint" id="expectedFileHint"></span>
+                <span data-i18n="expectedOutput">Expected</span>
+                <div class="header-actions">
+                    <button class="load-btn" id="loadExpectedBtn" data-i18n="loadExpected" data-i18n-title="loadExpectedTitle">...</button>
+                    <button class="load-btn clear-btn" id="clearExpectedBtn" data-i18n="clearFile" data-i18n-title="clearFileTitle" style="display:none;">&#10005;</button>
+                    <span class="file-hint" id="expectedFileHint"></span>
+                </div>
             </div>
             <div class="editor-area" id="expectedArea">
-                <textarea id="expectedEditor" placeholder="输入预期输出，或拖拽 .out/.txt 文件到此处..." spellcheck="false"></textarea>
-                <div class="drop-overlay" id="expectedDropOverlay">松开以加载预期输出文件</div>
+                <textarea id="expectedEditor" data-i18n-placeholder="expectedPlaceholder" placeholder="Enter expected..." spellcheck="false"></textarea>
+                <div class="drop-overlay" id="expectedDropOverlay" data-i18n="dropExpected">Drop expected file</div>
             </div>
         </div>
         <div class="column">
-            <div class="column-header"><span>实际输出</span></div>
+            <div class="column-header"><span data-i18n="actualOutput">Actual</span></div>
             <div class="tabs">
-                <div class="tab active" data-tab="output">输出</div>
-                <div class="tab" data-tab="diff">差异</div>
-                <div class="tab" data-tab="stderr">stderr<span class="stderr-badge">!</span></div>
+                <div class="tab active" data-tab="output" data-i18n="output">Output</div>
+                <div class="tab" data-tab="diff" data-i18n="diff">Diff</div>
+                <div class="tab" data-tab="stderr" data-i18n="stderr">stderr<span class="stderr-badge">!</span></div>
             </div>
             <div class="tab-content active" id="tab-output">
-                <textarea id="outputDisplay" readonly placeholder="运行后在此显示..." spellcheck="false"></textarea>
+                <textarea id="outputDisplay" readonly data-i18n-placeholder="outputPlaceholder" placeholder="Output..." spellcheck="false"></textarea>
             </div>
             <div class="tab-content" id="tab-diff">
-                <div class="diff-view" id="diffView">运行后在此显示差异...</div>
+                <div class="diff-view" id="diffView" data-i18n="diffPlaceholder">Diff...</div>
             </div>
             <div class="tab-content" id="tab-stderr">
-                <textarea id="stderrDisplay" readonly placeholder="无 stderr" spellcheck="false"></textarea>
+                <textarea id="stderrDisplay" readonly data-i18n-placeholder="noStderr" placeholder="No stderr" spellcheck="false"></textarea>
             </div>
         </div>
     </div>
 
     <div class="result-bar">
-        <div class="result-item"><span class="label">状态:</span><span class="value" id="resultStatus">-</span></div>
-        <div class="result-item"><span class="label">时间:</span><span class="value" id="resultTime">-</span></div>
+        <div class="result-item" id="resultFileName" style="display:none;"><span class="value" id="resultFileNameValue"></span></div>
+        <div class="result-item"><span class="label" data-i18n="time">Time:</span><span class="value" id="resultTime">-</span></div>
         <div class="result-item" id="resultPerformance" style="display:none;"><span class="label" id="resultPerfLabel"></span><span class="value" id="resultPerfValue"></span></div>
         <div class="result-item" id="resultPerfDetail" style="display:none; color:var(--vscode-descriptionForeground); font-size:10px;"></div>
-        <div class="result-item"><span class="label">内存:</span><span class="value" id="resultMemory">-</span></div>
-        <div class="result-item"><span class="label">退出码:</span><span class="value" id="resultExitCode">-</span></div>
-        <div class="result-item" id="resultMatch" style="display:none;"><span class="label">比对:</span><span class="value" id="resultMatchValue">-</span></div>
-        <div class="result-item" id="resultFileIo" style="display:none;"><span class="label">文件I/O:</span><span class="value" id="resultFileIoValue" style="font-size:10px;"></span></div>
+        <div class="result-item"><span class="label" data-i18n="memory">Memory:</span><span class="value" id="resultMemory">-</span></div>
+        <div class="result-item"><span class="label" data-i18n="exitCode">Exit:</span><span class="value" id="resultExitCode">-</span></div>
+        <div class="result-item" id="resultMatch" style="display:none;"><span class="label" data-i18n="match">Match:</span><span class="value" id="resultMatchValue">-</span></div>
+        <div class="result-item" id="resultFileIo" style="display:none;"><span class="label" data-i18n="fileIo">File I/O:</span><span class="value" id="resultFileIoValue" style="font-size:10px;"></span></div>
     </div>
 
-    <!-- 使用说明模态框（内容由扩展主进程从 docs/panel-help.md 读取后动态填充）/ Help modal (content loaded from docs/panel-help.md) -->
     <div id="helpModal" style="display:none; position:fixed; inset:0; z-index:100; background-color:rgba(0,0,0,.5); align-items:center; justify-content:center;">
         <div style="background-color:var(--vscode-editor-background); border:1px solid var(--vscode-panel-border); border-radius:6px; padding:20px; max-width:720px; max-height:85vh; overflow:auto; font-size:12px; line-height:1.6;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; border-bottom:1px solid var(--vscode-panel-border); padding-bottom:8px;">
-                <h2 style="margin:0; font-size:14px;">C++ Runner 使用说明</h2>
-                <button id="closeHelpBtn" style="background:none; border:none; color:var(--vscode-foreground); cursor:pointer; font-size:16px;">&times;</button>
+                <h2 style="margin:0; font-size:14px;" data-i18n="helpTitleModal">C++ Runner Help</h2>
+                <button id="closeHelpBtn" style="background:none; border:none; color:var(--vscode-foreground); cursor:pointer; font-size:16px;" data-i18n-title="helpClose">&times;</button>
             </div>
-            <div id="helpContent" style="color:var(--vscode-foreground);">加载中...</div>
+            <div id="helpContent" style="color:var(--vscode-foreground);" data-i18n="helpLoading">Loading...</div>
         </div>
     </div>
 
     <script>
         const vscode = acquireVsCodeApi();
         const $ = (id) => document.getElementById(id);
-        const runBtn = $('runBtn'), debugBtn = $('debugBtn'), statusBadge = $('statusBadge');
+        const runBtn = $('runBtn'), statusBadge = $('statusBadge');
         const inputEditor = $('inputEditor'), expectedEditor = $('expectedEditor');
         const outputDisplay = $('outputDisplay'), stderrDisplay = $('stderrDisplay'), diffView = $('diffView');
-        const resultStatus = $('resultStatus'), resultTime = $('resultTime'), resultMemory = $('resultMemory');
+        const resultTime = $('resultTime'), resultMemory = $('resultMemory');
         const resultExitCode = $('resultExitCode'), resultMatch = $('resultMatch'), resultMatchValue = $('resultMatchValue');
         const resultPerformance = $('resultPerformance'), resultPerfLabel = $('resultPerfLabel'), resultPerfValue = $('resultPerfValue');
         const resultPerfDetail = $('resultPerfDetail');
         const resultFileIo = $('resultFileIo'), resultFileIoValue = $('resultFileIoValue');
-        const sourceFileHint = $('sourceFileHint');
+        const resultFileName = $('resultFileName'), resultFileNameValue = $('resultFileNameValue');
         // 编译选项元素
         const cppStandardSelect = $('cppStandardSelect');
         const optLevelSelect = $('optLevelSelect');
@@ -585,6 +761,40 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         let expectedFileContent = null;
         // 面板内运行快捷键（从设置 cppRunner.panelRunKey 读取，默认 ctrl+enter）
         let panelRunKey = 'ctrl+enter';
+        let isRunning = false;
+        // 多语言字符串
+        let localeStrings = {};
+
+        function t(key) { return localeStrings[key] || key; }
+
+        function applyShowControls(controls) {
+            const controlMap = {
+                'cppStandard': 'cppStandardGroup',
+                'optimizationLevel': 'optLevelGroup',
+                'warningLevel': 'warningLevelGroup',
+                'softTimeLimit': 'softTimeLimitGroup',
+                'softMemoryLimit': 'softMemLimitGroup',
+            };
+            for (const [key, id] of Object.entries(controlMap)) {
+                const el = $(id);
+                if (el) {
+                    el.style.display = controls.includes(key) ? '' : 'none';
+                }
+            }
+        }
+
+        function applyLocale(strings) {
+            localeStrings = strings;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.dataset.i18n);
+            });
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                el.title = t(el.dataset.i18nTitle);
+            });
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                el.placeholder = t(el.dataset.i18nPlaceholder);
+            });
+        }
 
         // 警告级别与标志数组互转
         function warningLevelToFlags(level) {
@@ -643,17 +853,24 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         }
 
         // 运行按钮
-        runBtn.addEventListener('click', () => { doRun(); });
-        // 调试按钮
-        debugBtn.addEventListener('click', () => { vscode.postMessage({ command: 'debug' }); });
+        runBtn.addEventListener('click', () => { if (!isRunning) doRun(); });
 
-        // 设置入口按钮（可视化 / JSON 配置文件）
-        $('settingsBtn').addEventListener('click', () => { vscode.postMessage({ command: 'openSettings' }); });
-        $('settingsJsonBtn').addEventListener('click', () => { vscode.postMessage({ command: 'openSettingsJson' }); });
-
-        // 说明按钮：显示使用说明模态框
-        $('helpBtn').addEventListener('click', () => {
-            $('helpModal').style.display = 'flex';
+        // 移除已加载文件按钮：清除内容、路径、缓存，恢复可编辑
+        $('clearInputBtn').addEventListener('click', () => {
+            inputEditor.value = '';
+            inputEditor.readOnly = false;
+            inputFilePath = null;
+            inputFileContent = null;
+            $('inputFileHint').textContent = '';
+            $('clearInputBtn').style.display = 'none';
+        });
+        $('clearExpectedBtn').addEventListener('click', () => {
+            expectedEditor.value = '';
+            expectedEditor.readOnly = false;
+            expectedFilePath = null;
+            expectedFileContent = null;
+            $('expectedFileHint').textContent = '';
+            $('clearExpectedBtn').style.display = 'none';
         });
         $('closeHelpBtn').addEventListener('click', () => {
             $('helpModal').style.display = 'none';
@@ -692,7 +909,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
 
         // stderr 徽章更新：有 stderr 输出时显示红色感叹号
         function updateStderrBadge(text) {
-            if (text && text.trim() && text !== '(无 stderr)') {
+            if (text && text.trim() && text !== '(' + t('noStderr') + ')') {
                 stderrBadge.classList.add('show');
             } else {
                 stderrBadge.classList.remove('show');
@@ -729,13 +946,12 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 e.preventDefault(); e.stopPropagation();
                 area.classList.remove('drag-over');
 
-                // 1. 尝试 text/uri-list（file:// URI）：有完整路径，走扩展主进程统一加载
                 const uriList = e.dataTransfer.getData('text/uri-list');
                 if (uriList && uriList.trim()) {
                     const uri = uriList.trim().split('\\n')[0].trim();
                     if (uri) {
                         vscode.postMessage({ command: 'loadFileRequest', target: target, fileUri: uri });
-                        hintEl.textContent = '正在载入...';
+                        hintEl.textContent = t('loading');
                         return;
                     }
                 }
@@ -757,7 +973,9 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                             } else {
                                 expectedFileContent = file;
                             }
-                            hintEl.textContent = file.name + ' (大文件部分预览，运行时完整读取)';
+                            hintEl.textContent = file.name + ' (' + t('largeFilePreview') + ')';
+                            const clearBtn = areaId === 'inputArea' ? $('clearInputBtn') : $('clearExpectedBtn');
+                            if (clearBtn) clearBtn.style.display = '';
                         } else {
                             // 小文件：完整读取，可编辑
                             const content = await file.text();
@@ -769,9 +987,11 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                                 expectedFileContent = null;
                             }
                             hintEl.textContent = file.name;
+                            const clearBtn = areaId === 'inputArea' ? $('clearInputBtn') : $('clearExpectedBtn');
+                            if (clearBtn) clearBtn.style.display = '';
                         }
                     } catch (err) {
-                        hintEl.textContent = '读取失败: ' + err.message;
+                        hintEl.textContent = t('loadingFail') + ': ' + err.message;
                     }
                     return;
                 }
@@ -785,7 +1005,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 }
 
                 // 4. 所有方法均失败：显示提示
-                hintEl.textContent = '无法识别拖拽内容，请拖拽文件或使用"载入文件"按钮';
+                hintEl.textContent = t('dropUnknown');
             });
         }
         setupDrop('inputArea', 'inputDropOverlay');
@@ -821,19 +1041,28 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             const msg = event.data;
             switch (msg.command) {
                 case 'triggerRun':
-                    // 由外部快捷键触发运行：收集当前编辑器内容和软限制并发送 run 消息
                     doRun();
+                    break;
+                case 'sourceFile':
+                    if (msg.fileName) {
+                        resultFileName.style.display = 'flex';
+                        resultFileNameValue.textContent = msg.fileName;
+                    } else {
+                        resultFileName.style.display = 'none';
+                    }
                     break;
                 case 'helpContent':
                     // 从扩展主进程接收帮助文档（Markdown），转换为 HTML 后填充到帮助模态框
                     $('helpContent').innerHTML = markdownToHtml(msg.markdown);
                     break;
                 case 'panelRunKey':
-                    // 从扩展主进程接收面板内运行快捷键设置
                     panelRunKey = (msg.key || '').toLowerCase().trim();
                     break;
-                case 'setSourceFile':
-                    sourceFileHint.textContent = msg.fileName ? ('编译目标: ' + msg.fileName) : '';
+                case 'showControls':
+                    applyShowControls(msg.controls || []);
+                    break;
+                case 'locale':
+                    applyLocale(msg.strings || {});
                     break;
                 case 'initData':
                     if (msg.input !== undefined) inputEditor.value = msg.input;
@@ -843,6 +1072,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     {
                         const editor = msg.target === 'inputArea' ? inputEditor : expectedEditor;
                         const hintEl = msg.target === 'inputArea' ? $('inputFileHint') : $('expectedFileHint');
+                        const clearBtn = msg.target === 'inputArea' ? $('clearInputBtn') : $('clearExpectedBtn');
                         editor.value = msg.content;
                         // 通过扩展主进程加载的文件，清除 File API 缓存
                         if (msg.target === 'inputArea') {
@@ -858,7 +1088,8 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                                 expectedFilePath = msg.filePath;
                             }
                             editor.readOnly = true;
-                            if (hintEl) hintEl.textContent = msg.fileName + ' (大文件部分预览，运行时完整读取)';
+                            if (hintEl) hintEl.textContent = msg.fileName + ' (' + t('largeFilePreview') + ')';
+                            if (clearBtn) clearBtn.style.display = '';
                         } else {
                             // 小文件模式：可编辑，清除文件路径标记
                             if (msg.target === 'inputArea') {
@@ -868,12 +1099,16 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                             }
                             editor.readOnly = false;
                             if (hintEl) hintEl.textContent = msg.truncated ? (msg.fileName + ' (已截断)') : msg.fileName;
+                            if (clearBtn) clearBtn.style.display = '';
                         }
                     }
                     break;
                 case 'fileError':
                     const eh = msg.target === 'inputArea' ? $('inputFileHint') : $('expectedFileHint');
                     if (eh) eh.textContent = '读取失败: ' + msg.error;
+                    break;
+                case 'showHelp':
+                    $('helpModal').style.display = 'flex';
                     break;
                 case 'compileOptions':
                     // 接收扩展主进程发送的编译选项，更新下拉菜单
@@ -884,54 +1119,59 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     }
                     break;
                 case 'running':
+                    isRunning = true;
                     runBtn.disabled = true;
                     statusBadge.className = 'status-badge status-running';
-                    statusBadge.innerHTML = '<span class="spinner"></span> 运行中';
-                    outputDisplay.value = ''; stderrDisplay.value = ''; diffView.innerHTML = '运行中...';
+                    statusBadge.innerHTML = '<span class="spinner"></span> ' + t('running');
+                    outputDisplay.value = ''; stderrDisplay.value = ''; diffView.innerHTML = t('runningElipsis');
                     updateStderrBadge('');
                     break;
                 case 'compileError':
+                    isRunning = false;
                     runBtn.disabled = false;
-                    statusBadge.className = 'status-badge status-re';
-                    statusBadge.innerText = 'CE';
+                    statusBadge.className = 'status-badge status-ce';
+                    statusBadge.innerText = t('ce');
                     outputDisplay.value = '';
-                    stderrDisplay.value = msg.stderr || '编译失败';
+                    stderrDisplay.value = msg.stderr || t('compileError');
                     updateStderrBadge(stderrDisplay.value);
                     document.querySelector('.tab[data-tab="stderr"]').click();
-                    resultStatus.innerText = 'CE';
                     resultTime.innerText = '-'; resultMemory.innerText = '-'; resultExitCode.innerText = '-';
                     resultMatch.style.display = 'none';
                     resultPerformance.style.display = 'none';
                     break;
                 case 'runResult':
+                    isRunning = false;
                     runBtn.disabled = false;
                     const r = msg.result;
-                    outputDisplay.value = r.stdout || '(无输出)';
-                    stderrDisplay.value = r.stderr || '(无 stderr)';
-                    // stderr 徽章：cerr 输出始终显示
+                    outputDisplay.value = r.stdout || '(' + t('noOutput') + ')';
+                    stderrDisplay.value = r.stderr || '(' + t('noStderr') + ')';
                     updateStderrBadge(r.stderr);
 
                     if (r.match === true) {
-                        diffView.innerHTML = '<div style="color:#4caf50;padding:6px;">&#10004; 输出与预期完全匹配</div>';
+                        diffView.innerHTML = '<div style="color:#52C41A;padding:6px;">&#10004; ' + t('matchOk') + '</div>';
                     } else if (r.match === false) {
                         renderDiff(diffView, r);
                     } else {
-                        diffView.innerHTML = '<div style="color:var(--vscode-descriptionForeground);padding:6px;">未设置预期输出，跳过比对</div>';
+                        diffView.innerHTML = '<div style="color:var(--vscode-descriptionForeground);padding:6px;">' + t('matchSkip') + '</div>';
                     }
 
-                    // 状态映射：包含软限制 (TLE/MLE) 和硬限制 (TLE_HARD/MLE_HARD)
+                    let finalStatus = r.status;
+                    if (finalStatus === 'OK' && r.match === false) {
+                        finalStatus = 'WA';
+                    }
+
                     const sm = {
-                        'OK': { cls: 'status-ok', text: 'AC' },
-                        'RE': { cls: 'status-re', text: 'RE' },
-                        'TLE': { cls: 'status-tle', text: 'TLE' },
-                        'MLE': { cls: 'status-mle', text: 'MLE' },
-                        'TLE_HARD': { cls: 'status-tle', text: 'TLE!' },
-                        'MLE_HARD': { cls: 'status-mle', text: 'MLE!' },
+                        'OK': { cls: 'status-ac', text: t('ac') },
+                        'WA': { cls: 'status-wa', text: t('wa') },
+                        'RE': { cls: 'status-re', text: t('re') },
+                        'TLE': { cls: 'status-tle', text: t('tle') },
+                        'MLE': { cls: 'status-mle', text: t('mle') },
+                        'TLE_HARD': { cls: 'status-tle', text: t('tle') + '!' },
+                        'MLE_HARD': { cls: 'status-mle', text: t('mle') + '!' },
                     };
-                    const b = sm[r.status] || { cls: 'status-idle', text: r.status };
+                    const b = sm[finalStatus] || { cls: 'status-idle', text: finalStatus };
                     statusBadge.className = 'status-badge ' + b.cls;
-                    statusBadge.innerText = b.text;
-                    resultStatus.innerText = b.text;
+                    statusBadge.innerText = b.text.toUpperCase();
                     resultTime.innerText = r.timeMs !== undefined ? r.timeMs.toFixed(1) + ' ms' : '-';
                     resultMemory.innerText = r.peakMemoryBytes !== undefined ? (r.peakMemoryBytes / 1048576).toFixed(2) + ' MB' : '-';
                     resultExitCode.innerText = r.exitCode !== null ? r.exitCode : '-';
@@ -939,13 +1179,13 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     // 性能换算显示（含评测机备注和分数来源）
                     if (r.performanceInfo) {
                         const pi = r.performanceInfo;
-                        resultPerfLabel.textContent = pi.baselineName + ':';
+                        const localizedName = pi.baselineKey === 'ccf' ? t('baselineCcf') : (pi.baselineKey === 'luogu' ? t('baselineLuogu') : pi.baselineName);
+                        resultPerfLabel.textContent = localizedName + ':';
                         resultPerfValue.textContent = pi.convertedTimeMs.toFixed(1) + ' ms';
-                        resultPerfValue.style.color = '#4caf50';
                         resultPerformance.style.display = 'flex';
                         // 显示详情：用户分数、评测机分数、来源
-                        const sourceText = pi.scoreSource === 'manual' ? '手动' : (pi.scoreSource === 'auto' ? '自动' : '未知');
-                        resultPerfDetail.textContent = '设备GB6:' + pi.userScore + '（' + sourceText + ') ' + '/ 评测机:' + pi.baselineScore;
+                        const sourceText = pi.scoreSource === 'manual' ? t('manual') : (pi.scoreSource === 'auto' ? t('auto') : t('unknown'));
+                        resultPerfDetail.textContent = t('deviceGB6') + ':' + pi.userScore + '(' + sourceText + ') / ' + t('judgeMachine') + ':' + pi.baselineScore;
                         resultPerfDetail.style.display = 'flex';
                         resultPerfDetail.title = pi.baselineNote;
                     } else {
@@ -966,8 +1206,8 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
 
                     if (r.match !== undefined) {
                         resultMatch.style.display = 'flex';
-                        resultMatchValue.innerText = r.match ? '一致' : '不一致';
-                        resultMatchValue.style.color = r.match ? '#4caf50' : '#f44336';
+                        resultMatchValue.innerText = r.match ? t('consistent') : t('inconsistent');
+                        resultMatchValue.style.color = r.match ? '#52C41A' : '#E74C3C';
                     } else {
                         resultMatch.style.display = 'none';
                     }
@@ -981,7 +1221,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 const lines = result.diffSummary.split('\\n');
                 container.innerHTML = lines.map(line => {
                     if (line.startsWith('  Line')) {
-                        return '<div class="diff-line diff-expected" style="color:#f44336;">' + escapeHtml(line) + '</div>';
+                        return '<div class="diff-line diff-expected" style="color:#E74C3C;">' + escapeHtml(line) + '</div>';
                     } else if (line.startsWith('    Expected:')) {
                         return '<div class="diff-line diff-expected">' + escapeHtml(line) + '</div>';
                     } else if (line.startsWith('    Actual:')) {
@@ -990,7 +1230,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     return '<div class="diff-line">' + escapeHtml(line) + '</div>';
                 }).join('');
             } else {
-                container.innerHTML = '<div style="color:var(--vscode-descriptionForeground);padding:6px;">输出与预期不一致</div>';
+                container.innerHTML = '<div style="color:var(--vscode-descriptionForeground);padding:6px;">' + t('matchDiff') + '</div>';
             }
         }
         function escapeHtml(text) {

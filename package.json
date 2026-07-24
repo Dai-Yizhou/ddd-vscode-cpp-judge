@@ -2,7 +2,7 @@
   "name": "vscode-cpp-runner",
   "displayName": "C++ Runner",
   "description": "Compile, run and debug C++ single files with input/output management and diff comparison",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "publisher": "cpp-runner",
   "license": "MIT",
   "engines": {
@@ -11,14 +11,20 @@
   "categories": [
     "Programming Languages",
     "Debuggers",
-    "Testing"
+    "Testing",
+    "Other"
   ],
   "keywords": [
     "c++",
     "cpp",
+    "compile",
     "run",
     "debug",
-    " competitive programming"
+    "competitive programming",
+    "algorithm",
+    "oj",
+    "online judge",
+    "luogu"
   ],
   "repository": {
     "type": "git",
@@ -28,6 +34,8 @@
     "url": "https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge/issues"
   },
   "homepage": "https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge#readme",
+  "pricing": "Free",
+  "qna": "https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge/issues",
   "activationEvents": [
     "onLanguage:cpp"
   ],
@@ -93,6 +101,12 @@
         "title": "Debug (from Panel)",
         "category": "C++ Runner",
         "icon": "$(debug-alt)"
+      },
+      {
+        "command": "cppRunner.helpFromPanel",
+        "title": "Help",
+        "category": "C++ Runner",
+        "icon": "$(question)"
       },
       {
         "command": "cppRunner.openSettings",
@@ -164,33 +178,23 @@
       ],
       "view/title": [
         {
-          "command": "cppRunner.runFromPanel",
+          "command": "cppRunner.helpFromPanel",
           "when": "view == cppRunner.runnerView",
-          "group": "navigation@1"
-        },
-        {
-          "command": "cppRunner.debugFromPanel",
-          "when": "view == cppRunner.runnerView",
-          "group": "navigation@2"
+          "group": "navigation"
         },
         {
           "command": "cppRunner.openSettings",
           "when": "view == cppRunner.runnerView",
-          "group": "navigation@3"
-        },
-        {
-          "command": "cppRunner.openSettingsJson",
-          "when": "view == cppRunner.runnerView",
-          "group": "navigation@4"
+          "group": "navigation"
         }
       ]
     },
     "viewsContainers": {
-      "panel": [
+      "activitybar": [
         {
           "id": "cppRunnerPanel",
           "title": "C++ Runner",
-          "icon": "$(terminal)"
+          "icon": "$(run)"
         }
       ]
     },
@@ -199,7 +203,7 @@
         {
           "type": "webview",
           "id": "cppRunner.runnerView",
-          "name": "Runner"
+          "name": "C++ Runner"
         }
       ]
     },
@@ -327,6 +331,15 @@
           "type": "string",
           "default": "ctrl+enter",
           "description": "面板内触发运行的快捷键（在输入框中按下时触发运行）。格式：ctrl+shift+r / cmd+enter 等，留空则禁用 / Key to trigger run from within the panel textarea (e.g. ctrl+enter, empty to disable)"
+        },
+        "cppRunner.showControls": {
+          "type": "array",
+          "default": ["cppStandard", "optimizationLevel", "warningLevel", "softTimeLimit", "softMemoryLimit", "helpBtn", "settingsBtn"],
+          "items": {
+            "type": "string",
+            "enum": ["cppStandard", "optimizationLevel", "warningLevel", "softTimeLimit", "softMemoryLimit", "helpBtn", "settingsBtn"]
+          },
+          "description": "面板工具栏中显示的控件列表。可选值：cppStandard(C++标准)、optimizationLevel(优化级别)、warningLevel(警告级别)、softTimeLimit(软时限)、softMemoryLimit(软内存)、helpBtn(帮助按钮)、settingsBtn(设置按钮)。移除不需要的控件以简化界面 / Controls to display in panel toolbar"
         }
       }
     },
@@ -357,8 +370,8 @@
       },
       {
         "command": "cppRunner.openRunnerPanel",
-        "key": "alt+r",
-        "mac": "alt+r",
+        "key": "ctrl+alt+r",
+        "mac": "cmd+alt+r",
         "when": "editorLangId == cpp"
       },
       {

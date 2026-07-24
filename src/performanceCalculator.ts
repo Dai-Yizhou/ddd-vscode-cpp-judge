@@ -218,7 +218,9 @@ export interface PerformanceInfo {
     actualTimeMs: number;
     /** 换算后的运行时间（毫秒） */
     convertedTimeMs: number;
-    /** 目标评测机名称 */
+    /** 目标评测机标识键（用于前端本地化） */
+    baselineKey: string;
+    /** 目标评测机名称（后端原始名称，前端优先使用本地化） */
     baselineName: string;
     /** 目标评测机 CPU 型号 */
     baselineCpu: string;
@@ -255,6 +257,7 @@ export function getPerformanceInfo(
     return {
         actualTimeMs,
         convertedTimeMs,
+        baselineKey: targetBaseline,
         baselineName: benchmark.name,
         baselineCpu: benchmark.cpu,
         userScore,
