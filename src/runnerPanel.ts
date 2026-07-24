@@ -580,6 +580,9 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         // 大文件路径状态：载入大文件时存储完整路径，运行时直接从文件读取（不经过 textarea）
         let inputFilePath = null;
         let expectedFilePath = null;
+        // File API 拖拽的大文件内容缓存：File API 不暴露路径，完整内容保存在内存中
+        let inputFileContent = null;
+        let expectedFileContent = null;
         // 面板内运行快捷键（从设置 cppRunner.panelRunKey 读取，默认 ctrl+enter）
         let panelRunKey = 'ctrl+enter';
 
@@ -599,18 +602,43 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         }
 
         // 收集输入/预期/软限制并发送 run 消息
-        // 大文件模式下 inputFilePath/expectedFilePath 非空，扩展主进程直接从文件读取，不使用 textarea 内容
-        function doRun() {
+        // 大文件模式：
+        //   - 有 filePath（按钮载入 / text/uri-list 拖拽）：扩展主进程直接从文件流式读取
+        //   - 有 fileContent（File API 拖拽的大文件）：从 File 对象读取完整内容后发送
+        async function doRun() {
+            let inputVal = inputEditor.value;
+            let expectedVal = expectedEditor.value;
+            let inputPath = inputFilePath;
+            let expectedPath = expectedFilePath;
+
+            // File API 拖拽的大文件：读取完整内容后发送
+            if (inputFileContent) {
+                try {
+                    inputVal = await inputFileContent.text();
+                } catch (err) {
+                    inputVal = inputEditor.value;
+                }
+                inputPath = null;
+            }
+            if (expectedFileContent) {
+                try {
+                    expectedVal = await expectedFileContent.text();
+                } catch (err) {
+                    expectedVal = expectedEditor.value;
+                }
+                expectedPath = null;
+            }
+
             vscode.postMessage({
                 command: 'run',
-                input: inputFilePath ? '' : inputEditor.value,
-                expected: expectedFilePath ? '' : expectedEditor.value,
+                input: inputPath ? '' : inputVal,
+                expected: expectedPath ? '' : expectedVal,
                 softLimits: {
                     timeMs: parseInt(softTimeLimit.value, 10) || 0,
                     memoryMB: parseInt(softMemLimit.value, 10) || 0
                 },
-                inputFilePath: inputFilePath,
-                expectedFilePath: expectedFilePath
+                inputFilePath: inputPath,
+                expectedFilePath: expectedPath
             });
         }
 
@@ -671,13 +699,16 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             }
         }
 
-        // 拖拽支持：统一通过扩展主进程加载文件
-        // 无论大小，均发送 file:// URI 或路径给扩展主进程，由扩展主进程统一处理：
-        //   - 小文件：完整读取内容并填入 textarea
-        //   - 大文件（>1MB）：读取前 64KB 作为只读预览，运行时从文件流式读取
-        // 这样用户无需区分加载方式，拖拽与"载入文件"按钮行为完全一致。
-        function setupDrop(areaId) {
+        // 拖拽支持：File API 为主，text/uri-list 为辅
+        // VS Code Webview 中 File API 最可靠，但不暴露文件路径，因此：
+        //   - 小文件（≤1MB）：完整读取内容填入 textarea（可编辑）
+        //   - 大文件（>1MB）：仅读取前 64KB 作为预览（只读），完整内容保存在内存中
+        // 这样无论拖拽与"载入文件"按钮的 UI 行为完全一致，用户无需区分加载方式。
+        const BIG_FILE_THRESHOLD = 1024 * 1024; // 1MB，与扩展主进程阈值一致
+        const PREVIEW_SIZE = 64 * 1024;       // 64KB 预览
+        function setupDrop(areaId, overlayId) {
             const area = $(areaId);
+            const editor = areaId === 'inputArea' ? inputEditor : expectedEditor;
             const hintEl = areaId === 'inputArea' ? $('inputFileHint') : $('expectedFileHint');
             const target = areaId === 'inputArea' ? 'input' : 'expected';
             // dragenter/dragover 必须阻止默认行为才能触发 drop
@@ -694,15 +725,14 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 // 仅当离开 area 本身（而非子元素）时移除
                 if (e.target === area) area.classList.remove('drag-over');
             });
-            area.addEventListener('drop', (e) => {
+            area.addEventListener('drop', async (e) => {
                 e.preventDefault(); e.stopPropagation();
                 area.classList.remove('drag-over');
 
-                // 优先使用 text/uri-list（跨平台 file:// URI）
-                // macOS Finder 拖拽优先提供 text/uri-list，Windows 资源管理器也支持
+                // 1. 尝试 text/uri-list（file:// URI）：有完整路径，走扩展主进程统一加载
                 const uriList = e.dataTransfer.getData('text/uri-list');
                 if (uriList && uriList.trim()) {
-                    const uri = uriList.trim().split(/\r?\n/)[0].trim();
+                    const uri = uriList.trim().split('\\n')[0].trim();
                     if (uri) {
                         vscode.postMessage({ command: 'loadFileRequest', target: target, fileUri: uri });
                         hintEl.textContent = '正在载入...';
@@ -710,15 +740,43 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     }
                 }
 
-                // 回退：File API 获取文件名（仅用于显示提示）
+                // 2. 尝试 File API（Webview 内直接读取）：无路径，UI 行为与按钮载入保持一致
                 const files = e.dataTransfer.files;
                 if (files && files.length > 0) {
-                    const fileName = files[0].name;
-                    hintEl.textContent = '无法获取文件路径，请尝试点击"载入文件"按钮';
+                    const file = files[0];
+                    try {
+                        if (file.size > BIG_FILE_THRESHOLD) {
+                            // 大文件：仅读取前 64KB 作为预览（只读）
+                            const slice = file.slice(0, PREVIEW_SIZE);
+                            const preview = await slice.text();
+                            editor.value = preview;
+                            editor.readOnly = true;
+                            // 保存完整 File 对象，运行时读取完整内容
+                            if (areaId === 'inputArea') {
+                                inputFileContent = file;
+                            } else {
+                                expectedFileContent = file;
+                            }
+                            hintEl.textContent = file.name + ' (大文件部分预览，运行时完整读取)';
+                        } else {
+                            // 小文件：完整读取，可编辑
+                            const content = await file.text();
+                            editor.value = content;
+                            editor.readOnly = false;
+                            if (areaId === 'inputArea') {
+                                inputFileContent = null;
+                            } else {
+                                expectedFileContent = null;
+                            }
+                            hintEl.textContent = file.name;
+                        }
+                    } catch (err) {
+                        hintEl.textContent = '读取失败: ' + err.message;
+                    }
                     return;
                 }
 
-                // 纯文本路径
+                // 3. 尝试 text/plain（文件路径）
                 const plainText = e.dataTransfer.getData('text/plain');
                 if (plainText && plainText.trim()) {
                     vscode.postMessage({ command: 'loadFileRequest', target: target, fileUri: plainText.trim() });
@@ -726,23 +784,34 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     return;
                 }
 
+                // 4. 所有方法均失败：显示提示
                 hintEl.textContent = '无法识别拖拽内容，请拖拽文件或使用"载入文件"按钮';
             });
         }
-        setupDrop('inputArea');
-        setupDrop('expectedArea');
+        setupDrop('inputArea', 'inputDropOverlay');
+        setupDrop('expectedArea', 'expectedDropOverlay');
 
-        // 用户手动编辑 textarea 时清除大文件路径标记，恢复可编辑模式
+        // 用户手动编辑 textarea 时清除大文件路径标记和 File API 缓存，恢复可编辑模式
         // 大文件预览是只读的，此监听主要处理小文件模式下用户编辑后的状态更新
         inputEditor.addEventListener('input', () => {
-            if (inputFilePath && !inputEditor.readOnly) {
-                inputFilePath = null;
+            if (!inputEditor.readOnly) {
+                if (inputFilePath) {
+                    inputFilePath = null;
+                }
+                if (inputFileContent) {
+                    inputFileContent = null;
+                }
                 $('inputFileHint').textContent = '';
             }
         });
         expectedEditor.addEventListener('input', () => {
-            if (expectedFilePath && !expectedEditor.readOnly) {
-                expectedFilePath = null;
+            if (!expectedEditor.readOnly) {
+                if (expectedFilePath) {
+                    expectedFilePath = null;
+                }
+                if (expectedFileContent) {
+                    expectedFileContent = null;
+                }
                 $('expectedFileHint').textContent = '';
             }
         });
@@ -775,6 +844,12 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                         const editor = msg.target === 'inputArea' ? inputEditor : expectedEditor;
                         const hintEl = msg.target === 'inputArea' ? $('inputFileHint') : $('expectedFileHint');
                         editor.value = msg.content;
+                        // 通过扩展主进程加载的文件，清除 File API 缓存
+                        if (msg.target === 'inputArea') {
+                            inputFileContent = null;
+                        } else {
+                            expectedFileContent = null;
+                        }
                         if (msg.filePath) {
                             // 大文件模式：存储完整路径，textarea 只读显示预览
                             if (msg.target === 'inputArea') {
@@ -783,7 +858,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                                 expectedFilePath = msg.filePath;
                             }
                             editor.readOnly = true;
-                            if (hintEl) hintEl.textContent = msg.fileName + ' (大文件预览，运行时完整读取)';
+                            if (hintEl) hintEl.textContent = msg.fileName + ' (大文件部分预览，运行时完整读取)';
                         } else {
                             // 小文件模式：可编辑，清除文件路径标记
                             if (msg.target === 'inputArea') {

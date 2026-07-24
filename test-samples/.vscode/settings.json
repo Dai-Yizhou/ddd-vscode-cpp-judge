@@ -1,6 +1,6 @@
 {
     "cppRunner.cppStandard": "c++17",
-    "cppRunner.optimizationLevel": "-O0",
+    "cppRunner.optimizationLevel": "-O2",
     "cppRunner.warningFlags": [
         "-Wall",
         "-Wextra"
