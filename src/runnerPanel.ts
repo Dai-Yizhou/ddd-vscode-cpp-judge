@@ -757,7 +757,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                             } else {
                                 expectedFileContent = file;
                             }
-                            hintEl.textContent = file.name + ' (大文件预览，运行时完整读取)';
+                            hintEl.textContent = file.name + ' (大文件部分预览，运行时完整读取)';
                         } else {
                             // 小文件：完整读取，可编辑
                             const content = await file.text();
@@ -858,7 +858,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                                 expectedFilePath = msg.filePath;
                             }
                             editor.readOnly = true;
-                            if (hintEl) hintEl.textContent = msg.fileName + ' (大文件预览，运行时完整读取)';
+                            if (hintEl) hintEl.textContent = msg.fileName + ' (大文件部分预览，运行时完整读取)';
                         } else {
                             // 小文件模式：可编辑，清除文件路径标记
                             if (msg.target === 'inputArea') {
