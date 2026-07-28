@@ -267,7 +267,7 @@
         },
         "cppRunner.performanceBaseline": {
           "type": "string",
-          "default": "luogu",
+          "default": "none",
           "enum": [
             "none",
             "luogu",
@@ -334,7 +334,7 @@
         },
         "cppRunner.showControls": {
           "type": "array",
-          "default": ["cppStandard", "optimizationLevel", "warningLevel", "softTimeLimit", "softMemoryLimit", "helpBtn", "settingsBtn"],
+          "default": ["cppStandard", "optimizationLevel", "warningLevel", "helpBtn", "settingsBtn"],
           "items": {
             "type": "string",
             "enum": ["cppStandard", "optimizationLevel", "warningLevel", "softTimeLimit", "softMemoryLimit", "helpBtn", "settingsBtn"]
