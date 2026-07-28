@@ -169,14 +169,14 @@ export class ConfigManager {
      * 通过交互式 QuickPick 设置 C++ 标准和优化级别 /
      * Set C++ standard and optimization level interactively via QuickPick.
      *
-     * 该方法会依次弹出两个选择框：C++ 标准（c++11 ~ c++23）和优化级别（-O0 ~ -Os），
+     * 该方法会依次弹出两个选择框：C++ 标准（c++98 ~ c++26）和优化级别（-O0 ~ -Os），
      * 并将用户选择持久化到当前 Workspace 的 settings.json 中。
      * It sequentially prompts for C++ standard and optimization level, then persists
      * the choices to the current Workspace settings.json.
      */
     async setCompileOptions() {
         const standard = await vscode.window.showQuickPick(
-            ['c++11', 'c++14', 'c++17', 'c++20', 'c++23'],
+            ['c++98', 'c++11', 'c++14', 'c++17', 'c++20', 'c++23'],
             { placeHolder: 'Select C++ standard' }
         );
         if (!standard) return;

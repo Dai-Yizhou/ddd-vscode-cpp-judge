@@ -339,6 +339,10 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         this.post({ command: 'showControls', controls });
     }
 
+    showCompileWarning(stderr: string) {
+        this.post({ command: 'compileWarning', stderr });
+    }
+
     showCompileError(stderr: string) {
         this.post({ command: 'compileError', stderr });
     }
@@ -624,6 +628,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         <div class="opt-group" id="cppStandardGroup">
             <span class="opt-label" data-i18n="cppStandard" data-i18n-title="cppStandardTitle">Std</span>
             <select id="cppStandardSelect" data-i18n-title="cppStandardTitle">
+                <option value="c++98">c++98</option>
                 <option value="c++11">c++11</option>
                 <option value="c++14">c++14</option>
                 <option value="c++17">c++17</option>
@@ -1126,6 +1131,11 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     outputDisplay.value = ''; stderrDisplay.value = ''; diffView.innerHTML = t('runningElipsis');
                     updateStderrBadge('');
                     break;
+                case 'compileWarning':
+                    // 仅更新 stderr 显示，不改变状态，不切换标签，用于过编的情况
+                    stderrDisplay.value = msg.stderr || '';
+                    updateStderrBadge(stderrDisplay.value);
+                    break;
                 case 'compileError':
                     isRunning = false;
                     runBtn.disabled = false;
@@ -1144,7 +1154,12 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                     runBtn.disabled = false;
                     const r = msg.result;
                     outputDisplay.value = r.stdout || '(' + t('noOutput') + ')';
-                    stderrDisplay.value = r.stderr || '(' + t('noStderr') + ')';
+                    //不清除编译警告
+                    if(stderrDisplay.value) {
+                        stderrDisplay.value += '\\n';
+                    }
+                    stderrDisplay.value += "===== cerr / clog =====" + '\\n';
+                    stderrDisplay.value += r.stderr || '(' + t('noStderr') + ')';
                     updateStderrBadge(r.stderr);
 
                     if (r.match === true) {

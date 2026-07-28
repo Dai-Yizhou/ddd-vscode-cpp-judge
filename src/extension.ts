@@ -590,6 +590,9 @@ function registerPanelCallbacks() {
             runnerPanelProvider?.showCompileError(compileResult.stderr || '编译失败（无 stderr 输出）');
             try { fs.unlinkSync(compileResult.executablePath); } catch {}
             return;
+        } else {
+            //即使过编也显示警告
+            runnerPanelProvider?.showCompileWarning(compileResult.stderr || '');
         }
 
         // 文件 I/O 检测
