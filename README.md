@@ -6,9 +6,9 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)
 
-一键编译运行、可视化输入输出面板、自动差异比对、资源统计、性能换算与轻量级运行时保护。
+[English README](README-en-US.md)
 
-![English README](README-en-US.md)
+一键编译运行、可视化输入输出面板、自动差异比对、资源统计、性能换算与轻量级运行时保护。
 
 ## ✨ 功能特性
 

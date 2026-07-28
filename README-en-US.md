@@ -6,9 +6,10 @@
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)
 
+[中文版 README](README.md)
+
 One-click compile & run, visual I/O panel, automatic diff comparison, resource statistics, performance estimation, and lightweight runtime protection.
 
-[中文版 README](README.md)
 
 ## ✨ Features
 
