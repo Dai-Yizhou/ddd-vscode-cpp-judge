@@ -10,6 +10,7 @@ int main() {
     double d = 3.14;
     int y = d;
     cout << y << endl;
+    cerr << y <<'\n';
 
     return 0;
 }
