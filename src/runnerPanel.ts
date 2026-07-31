@@ -181,6 +181,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 softTimeLimit: "软时限", softTimeLimitTitle: "软时间限制 (ms)，0 = 不限",
                 softMemoryLimit: "软内存", softMemoryLimitTitle: "软内存限制 (MB)，0 = 不限",
                 help: "说明", helpTitle: "查看使用说明", settings: "设置", settingsTitle: "打开设置页面",
+                compileOptions: "编译选项", compileOptionsTitle: "编译选项",
                 ready: "就绪", running: "运行中", input: "输入", inputPlaceholder: "输入数据，或拖拽文件到此处...",
                 expectedOutput: "预期", expectedPlaceholder: "预期输出...", actualOutput: "实际",
                 output: "输出", diff: "差异", stderr: "stderr", status: "状态",
@@ -211,6 +212,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             softTimeLimit: "Time", softTimeLimitTitle: "Soft time limit (ms), 0 = unlimited",
             softMemoryLimit: "Mem", softMemoryLimitTitle: "Soft memory limit (MB), 0 = unlimited",
             help: "Help", helpTitle: "Show usage guide", settings: "Settings", settingsTitle: "Open settings",
+            compileOptions: "Options", compileOptionsTitle: "Compile Options",
             ready: "Ready", running: "Running", input: "Input", inputPlaceholder: "Enter input, or drop files here...",
             expectedOutput: "Expected", expectedPlaceholder: "Expected output...", actualOutput: "Actual",
             output: "Output", diff: "Diff", stderr: "Err", status: "Status",
@@ -430,6 +432,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             border-bottom: 1px solid var(--vscode-panel-border);
             flex-shrink: 0;
             flex-wrap: wrap;
+            position: relative;
         }
         .toolbar button {
             padding: 3px 10px;
@@ -458,6 +461,21 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             .toolbar button { padding: 4px 6px; }
             .toolbar button .btn-text { display: none; }
             .limit-input { width: 44px; }
+        }
+        /* Options 弹层：收纳编译选项，工具栏只保留 Run + Options 触发按钮 */
+        .options-popover {
+            display: none; position: absolute; top: 34px; left: 10px;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px; box-shadow: 0 8px 24px -8px rgba(0,0,0,.4);
+            padding: 8px; z-index: 50; min-width: 220px;
+        }
+        .options-popover.show { display: block; }
+        .options-popover .opt-group { margin-bottom: 4px; }
+        /* 弹层内标签始终可见，覆盖窄屏 .opt-label { display:none } */
+        .options-popover .opt-label { display: inline !important; }
+        .options-popover .popover-divider {
+            height: 1px; background-color: var(--vscode-panel-border); margin: 6px 0;
         }
         .source-file {
             font-size: 11px; color: var(--vscode-descriptionForeground);
@@ -621,6 +639,10 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
     <div class="toolbar">
         <button id="runBtn" data-i18n-title="runTitle">&#9654; <span class="btn-text" data-i18n="run">Run</span></button>
         <div class="sep"></div>
+        <button id="optionsBtn" class="secondary" data-i18n-title="compileOptionsTitle"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:middle;"><line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2" fill="currentColor" stroke="none"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2" fill="currentColor" stroke="none"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="7" cy="18" r="2" fill="currentColor" stroke="none"/></svg> <span class="btn-text" data-i18n="compileOptions">Options</span></button>
+        <div class="spacer"></div>
+        <span id="statusBadge" class="status-badge status-idle" data-i18n="ready">Ready</span>
+        <div id="optionsPopover" class="options-popover">
         <div class="opt-group" id="cppStandardGroup">
             <span class="opt-label" data-i18n="cppStandard" data-i18n-title="cppStandardTitle">Std</span>
             <select id="cppStandardSelect" data-i18n-title="cppStandardTitle">
@@ -652,7 +674,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
                 <option value="custom">custom</option>
             </select>
         </div>
-        <div class="sep"></div>
+        <div class="popover-divider"></div>
         <div class="opt-group" id="softTimeLimitGroup">
             <span class="opt-label" data-i18n="softTimeLimit" data-i18n-title="softTimeLimitTitle">Time</span>
             <input type="number" class="limit-input" id="softTimeLimit" value="0" min="0" data-i18n-title="softTimeLimitTitle" />
@@ -661,8 +683,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
             <span class="opt-label" data-i18n="softMemoryLimit" data-i18n-title="softMemoryLimitTitle">Mem</span>
             <input type="number" class="limit-input" id="softMemLimit" value="0" min="0" data-i18n-title="softMemoryLimitTitle" />
         </div>
-        <div class="spacer"></div>
-        <span id="statusBadge" class="status-badge status-idle" data-i18n="ready">Ready</span>
+        </div>
     </div>
 
     <div class="main-content">
@@ -854,6 +875,18 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
 
         // 运行按钮
         runBtn.addEventListener('click', () => { if (!isRunning) doRun(); });
+        // Options 弹层开关：点击按钮切换显示，点击外部关闭
+        const optionsBtn = $('optionsBtn');
+        const optionsPopover = $('optionsPopover');
+        optionsBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            optionsPopover.classList.toggle('show');
+        });
+        document.addEventListener('click', (e) => {
+            if (!optionsPopover.contains(e.target) && !optionsBtn.contains(e.target)) {
+                optionsPopover.classList.remove('show');
+            }
+        });
 
         // 移除已加载文件按钮：清除内容、路径、缓存，恢复可编辑
         $('clearInputBtn').addEventListener('click', () => {
