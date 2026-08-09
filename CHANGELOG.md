@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-08-09
+
+### Added
+- macOS 支持 `#include <bits/extc++.h>` 及常用 `pb_ds` 接口的有限兼容层
+- 真实 GNU GCC/libstdc++ 可用时自动避免内置兼容头文件覆盖
+- 检测 GNU 非标准头文件并提示可能增加编译时间
+- 支持可配置 C++ 源文件扩展名和结果栏字段显示
+
+### Changed
+- 调试功能标记为弃用，保留旧命令以兼容既有配置
+- 统一从外部模板加载运行面板 HTML
+- 统一从 locale 模块提供运行面板文本
+
 ## [0.2.0] - 2026-07-24 (LTS)
 
 ### Added

@@ -1,8 +1,8 @@
 {
   "name": "vscode-cpp-runner",
   "displayName": "C++ Runner",
-  "description": "Compile, run and debug C++ single files with input/output management and diff comparison",
-  "version": "0.2.0",
+  "description": "Compile and run C++ single files with input/output management and diff comparison",
+  "version": "0.2.1",
   "publisher": "cpp-runner",
   "license": "MIT",
   "engines": {
@@ -128,11 +128,7 @@
           "command": "cppRunner.compileAndRun",
           "group": "cppRunner@1"
         },
-        {
-          "when": "editorLangId == cpp",
-          "command": "cppRunner.debug",
-          "group": "cppRunner@2"
-        },
+
         {
           "when": "editorLangId == cpp",
           "command": "cppRunner.loadInputFile",
@@ -155,15 +151,7 @@
           "when": "editorLangId == cpp"
         },
         {
-          "command": "cppRunner.debug",
-          "when": "editorLangId == cpp"
-        },
-        {
           "command": "cppRunner.runFromPanel",
-          "when": "editorLangId == cpp"
-        },
-        {
-          "command": "cppRunner.debugFromPanel",
           "when": "editorLangId == cpp"
         },
         {
@@ -267,7 +255,7 @@
         },
         "cppRunner.performanceBaseline": {
           "type": "string",
-          "default": "luogu",
+          "default": "none",
           "enum": [
             "none",
             "luogu",
@@ -315,7 +303,7 @@
         },
         "cppRunner.expectedOutputFileExtensions": {
           "type": "array",
-          "default": ["txt", "out"],
+          "default": ["txt", "out", "ans"],
           "items": {
             "type": "string"
           },
@@ -334,12 +322,29 @@
         },
         "cppRunner.showControls": {
           "type": "array",
-          "default": ["cppStandard", "optimizationLevel", "warningLevel", "softTimeLimit", "softMemoryLimit", "helpBtn", "settingsBtn"],
+          "default": ["cppStandard","optimizationLevel","warningLevel" , "helpBtn", "settingsBtn"],
           "items": {
             "type": "string",
             "enum": ["cppStandard", "optimizationLevel", "warningLevel", "softTimeLimit", "softMemoryLimit", "helpBtn", "settingsBtn"]
           },
-          "description": "面板工具栏中显示的控件列表。可选值：cppStandard(C++标准)、optimizationLevel(优化级别)、warningLevel(警告级别)、softTimeLimit(软时限)、softMemoryLimit(软内存)、helpBtn(帮助按钮)、settingsBtn(设置按钮)。移除不需要的控件以简化界面 / Controls to display in panel toolbar"
+          "description": "面板工具栏中显示的控件列表。可选值：cppStandard(C++标准)、optimizationLevel(优化级别)、warningLevel(警告级别)、softTimeLimit(软时限)、softMemoryLimit(软内存)、helpBtn(帮助按钮)、settingsBtn(设置按钮)。运行按钮始终显示，不受此设置影响。移除不需要的控件以简化界面 / Controls to display in panel toolbar. Run button is always visible regardless of this setting."
+        },
+        "cppRunner.showResultFields": {
+          "type": "array",
+          "default": ["fileName", "status", "time"],
+          "items": {
+            "type": "string",
+            "enum": ["fileName", "status", "time", "memory", "exitCode", "match", "performance", "stderr", "fileIo"]
+          },
+          "description": "面板底部结果栏中显示的状态字段。可选值：fileName(文件名)、status(评测状态)、time(运行时间)、memory(峰值内存)、exitCode(退出码)、match(比对结果)、performance(性能换算)、stderr(标准错误)、fileIo(文件I/O)。隐藏的字段不占布局空间 / Result fields to display in the bottom bar. Hidden fields do not consume layout space."
+        },
+        "cppRunner.sourceFileExtensions": {
+          "type": "array",
+          "default": ["cpp", "cc", "cxx", "c++", "C"],
+          "items": {
+            "type": "string"
+          },
+          "description": "C++ 源文件扩展名列表（不带前导点号，大小写敏感）。编译、运行、打开面板时统一使用此列表判断源文件。/ C++ source file extensions (without leading dot, case-sensitive). Used for compile, run, and panel eligibility."
         }
       }
     },
@@ -350,24 +355,7 @@
         "mac": "cmd+shift+r",
         "when": "editorLangId == cpp"
       },
-      {
-        "command": "cppRunner.debugFromPanel",
-        "key": "ctrl+shift+d",
-        "mac": "cmd+shift+d",
-        "when": "editorLangId == cpp"
-      },
-      {
-        "command": "cppRunner.compileAndRun",
-        "key": "f6",
-        "mac": "f6",
-        "when": "editorTextFocus && editorLangId == cpp"
-      },
-      {
-        "command": "cppRunner.debug",
-        "key": "ctrl+shift+b",
-        "mac": "cmd+shift+b",
-        "when": "editorTextFocus && editorLangId == cpp"
-      },
+
       {
         "command": "cppRunner.openRunnerPanel",
         "key": "ctrl+alt+r",

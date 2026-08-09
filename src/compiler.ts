@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import { spawn } from 'child_process';
 import { ConfigManager } from './configManager';
+import { getStrings } from './locale';
 
 /**
  * 编译结果数据结构 / Compilation result data structure.
@@ -17,6 +18,7 @@ export interface CompileResult {
     diagnostics: vscode.Diagnostic[];
     /** 编译器原始 stderr 输出（含完整错误/警告信息）/ Raw compiler stderr output. */
     stderr: string;
+    nonStandardHeaderWarning?: string;
 }
 
 /**
@@ -42,15 +44,24 @@ export class Compiler {
      * The highest confirmed-working C++ standard for the current compiler.
      */
     private workingStandard: string | undefined;
+    /**
+     * 扩展安装路径，用于定位内置头文件目录。
+     * Extension installation path, used to locate the bundled headers directory.
+     */
+    private extensionPath: string;
+    private compilerKindCache: Map<string, boolean> = new Map();
 
     /**
      * @param configManager 配置管理器实例，用于获取编译参数 / ConfigManager instance for compiler options.
-     * @param outputChannel VSCode 输出通道，用于打印编译日志 / VSCode output channel for compilation logs.
+     * @param extensionPath 扩展安装路径，用于定位内置头文件 / Extension installation path for bundled headers.
+     * @deprecated outputChannel 仅为兼容旧日志流程保留。
      */
     constructor(
         private configManager: ConfigManager,
-        private outputChannel: vscode.OutputChannel
+        private outputChannel: vscode.OutputChannel,
+        extensionPath: string
     ) {
+        this.extensionPath = extensionPath;
         // 创建一个专属于 cppRunner 的诊断集合，生命周期与扩展一致
         // Create a diagnostic collection scoped to cppRunner, tied to extension lifecycle.
         this.diagnosticCollection = vscode.languages.createDiagnosticCollection('cppRunner');
@@ -93,6 +104,29 @@ export class Compiler {
                 // 编译器不可用时记为不支持，让上层走错误处理流程
                 // If the compiler itself cannot be spawned, treat as unsupported.
                 this.stdSupportCache.set(cacheKey, false);
+                resolve(false);
+            });
+        });
+    }
+
+    private async isGnuCompiler(compilerPath: string): Promise<boolean> {
+        const cached = this.compilerKindCache.get(compilerPath);
+        if (cached !== undefined) {
+            return cached;
+        }
+
+        return new Promise((resolve) => {
+            const proc = spawn(compilerPath, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] });
+            let output = '';
+            proc.stdout.on('data', (data) => { output += data.toString(); });
+            proc.stderr.on('data', (data) => { output += data.toString(); });
+            proc.on('close', () => {
+                const isGnu = /\b(gcc|g\+\+)\s+version\b/i.test(output) || /Free Software Foundation/i.test(output);
+                this.compilerKindCache.set(compilerPath, isGnu);
+                resolve(isGnu);
+            });
+            proc.on('error', () => {
+                this.compilerKindCache.set(compilerPath, false);
                 resolve(false);
             });
         });
@@ -165,6 +199,8 @@ export class Compiler {
      */
     async compile(sourceFile: string, debug: boolean = false): Promise<CompileResult> {
         const compilerPath = this.configManager.getCompilerPath();
+        const isMacOS = os.platform() === 'darwin';
+        const isGnu = isMacOS ? await this.isGnuCompiler(compilerPath) : false;
         // 解析实际可用的 C++ 标准：若编译器不支持用户请求的标准（如 c++23）则自动回退
         // Resolve the effective standard: auto-fallback if the compiler doesn't support the requested one (e.g. c++23).
         const standard = await this.resolveStandard(compilerPath, this.configManager.getCppStandard());
@@ -179,7 +215,7 @@ export class Compiler {
         const exeSuffix = isWindows ? '.exe' : '';
         const executablePath = outputDir
             ? path.join(outputDir, baseName + exeSuffix)
-            : sourceFile.replace(/\.cpp$/i, '') + exeSuffix;
+            : sourceFile.replace(/\.[^/.]+$/, '') + exeSuffix;
 
         // Ensure output directory exists
         // 若用户指定了输出目录但目录不存在，则递归创建，防止编译器因目录缺失而报错
@@ -192,6 +228,9 @@ export class Compiler {
             optimization,
             ...warningFlags,
             ...(debug ? ['-g'] : []),
+            // macOS 不包含 <bits/stdc++.h>，添加内置兼容头文件路径
+            // macOS does not ship <bits/stdc++.h>; add bundled headers for compatibility
+            ...(isMacOS && !isGnu ? ['-isystem', path.join(this.extensionPath, 'headers')] : []),
             '-o', executablePath,
             sourceFile
         ];
@@ -214,11 +253,20 @@ export class Compiler {
                 const diagnostics = this.parseDiagnostics(stderr, sourceFile);
                 this.diagnosticCollection.set(vscode.Uri.file(sourceFile), diagnostics);
 
+                let sourceContent = '';
+                try {
+                    sourceContent = fs.readFileSync(sourceFile, 'utf-8');
+                } catch {}
+                const usesNonStandardHeaders = /#\s*include\s*[<"](?:bits\/extc\+\+\.h|ext\/pb_ds\/[^>"]+)[>"]/.test(sourceContent);
+                const nonStandardHeaderWarning = usesNonStandardHeaders
+                    ? getStrings().nonStandardHeaderWarning
+                    : undefined;
+
                 if (code === 0) {
-                    resolve({ success: true, executablePath, diagnostics, stderr });
+                    resolve({ success: true, executablePath, diagnostics, stderr, nonStandardHeaderWarning });
                 } else {
                     this.outputChannel.appendLine(stderr);
-                    resolve({ success: false, executablePath, diagnostics, stderr });
+                    resolve({ success: false, executablePath, diagnostics, stderr, nonStandardHeaderWarning });
                 }
             });
 

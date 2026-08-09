@@ -34,8 +34,8 @@ export class ExpectedOutputManager {
     getExpectedFilePath(sourceFile: string): string {
         const extensions = this.configManager.getExpectedOutputFileExtensions();
         const ext = extensions.length > 0 ? extensions[0] : 'txt';
-        // 大小写不敏感匹配 .cpp / Case-insensitive .cpp match
-        return sourceFile.replace(/\.cpp$/i, `.expected.${ext}`);
+        // 大小写不敏感匹配 C++ 扩展名 / Case-insensitive C++ extension match
+        return sourceFile.replace(/\.[^/.]+$/i, `.expected.${ext}`);
     }
 
     /**
@@ -80,9 +80,9 @@ export class ExpectedOutputManager {
      * @param sourceFile - 源文件（.cpp）的绝对路径
      */
     clearExpectedOutput(sourceFile: string) {
-        // 使用正则提取 baseName 以支持大小写不敏感的 .cpp 扩展名
-        // Use regex to extract baseName for case-insensitive .cpp extension
-        const baseName = path.basename(sourceFile).replace(/\.cpp$/i, '');
+        // 使用正则提取 baseName 以支持多种 C++ 扩展名（大小写不敏感）
+        // Use regex to extract baseName for case-insensitive C++ extensions
+        const baseName = path.basename(sourceFile).replace(/\.[^/.]+$/i, '');
         const dirName = path.dirname(sourceFile);
         const extensions = this.configManager.getExpectedOutputFileExtensions();
         

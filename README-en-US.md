@@ -2,13 +2,14 @@
 
 > A VS Code extension designed for rapid C++ single-file testing and competitive programming
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![Version](https://img.shields.io/badge/version-0.2.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)
 
+[中文版 README](README.md)
+
 One-click compile & run, visual I/O panel, automatic diff comparison, resource statistics, performance estimation, and lightweight runtime protection.
 
-[中文版 README](README.md)
 
 ## ✨ Features
 
@@ -16,7 +17,8 @@ One-click compile & run, visual I/O panel, automatic diff comparison, resource s
 - **One-click compile & run** via keyboard shortcut, command palette, or context menu
 - **Customizable compile options**: C++ standard (c++11/14/17/20/23), optimization level (-O0 ~ -O3/-Os), warning flags
 - **Auto-save**: Dirty files are automatically saved before compilation
-- **Debug support**: One-click debug configuration generation and session launch
+- **Debug deprecated**: The legacy command remains for compatibility; use the built-in VS Code debugger instead
+- **GNU extension compatibility**: macOS supports `#include <bits/extc++.h>` with common `pb_ds` interfaces
 
 ### 📝 Input & Output Management
 - **Three-column panel layout**: Input / Expected Output / Actual Output, docked in sidebar
@@ -90,6 +92,7 @@ All settings are under the `cppRunner` namespace in `settings.json`.
 | `optimizationLevel` | string | `-O2` | Optimization level |
 | `warningFlags` | string[] | `[-Wall, -Wextra]` | Warning flags |
 | `outputDirectory` | string | `""` | Output directory for compiled binaries |
+| `sourceFileExtensions` | string[] | `["cpp", "cc", "cxx", "c++", "C"]` | C++ source file extensions, matched case-insensitively |
 
 ### Runtime Settings
 
@@ -100,6 +103,7 @@ All settings are under the `cppRunner` namespace in `settings.json`.
 | `ignoreTrailingWhitespace` | boolean | `true` | Ignore trailing whitespace in diff |
 | `panelRunKey` | string | `ctrl+enter` | Run shortcut inside panel |
 | `showControls` | string[] | `[...]` | Visible controls in panel |
+| `showResultFields` | string[] | `["fileName", "status", "time"]` | Visible result-bar fields |
 
 ### Performance Estimation
 
@@ -116,13 +120,25 @@ All settings are under the `cppRunner` namespace in `settings.json`.
 | `expectedOutputFileExtensions` | string[] | `["txt", "out"]` | Expected output file extensions |
 | `largeFileThreshold` | number | `1048576` | Large file threshold (bytes) |
 
+### macOS GNU Extensions
+
+On macOS, source files can use:
+
+```cpp
+#include <bits/extc++.h>
+```
+
+With Apple Clang, the extension provides a limited compatibility layer for common `tree`, `find_by_order()`, `order_of_key()`, and `gp_hash_table` usage. When a real GNU GCC/libstdc++ compiler is configured, the extension does not inject its bundled compatibility directory and GCC's native implementation takes precedence.
+
+These headers are not part of ISO C++ and may significantly increase compilation time. Install and configure GNU GCC when full GNU `pb_ds` behavior is required.
+
 ---
 
 ## 🖥️ Platform Compatibility
 
 | Platform | Compile & Run | Memory Detection | Debug |
 |----------|--------------|------------------|-------|
-| **macOS** | ✅ g++/clang++ | ✅ `ps` RSS query | ✅ lldb |
+| **macOS** | ✅ g++/clang++ | ✅ `ps` RSS query | ⚠️ Debug command deprecated |
 | **Linux** | ✅ g++/clang++ | ✅ `/proc` VmHWM | ✅ gdb |
 | **Windows** | ✅ g++ (MinGW) | ⚠️ Limited accuracy | ⚠️ MinGW gdb required |
 

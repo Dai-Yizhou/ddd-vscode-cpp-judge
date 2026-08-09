@@ -2,13 +2,13 @@
 
 > 一款专为 C++ 单文件快速测试与竞赛编程场景设计的 VSCode 扩展
 
-![Version](https://img.shields.io/badge/version-0.2.0-blue)
+![Version](https://img.shields.io/badge/version-0.2.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey)
 
-一键编译运行、可视化输入输出面板、自动差异比对、资源统计、性能换算与轻量级运行时保护。
+[English README](README-en-US.md)
 
-![English README](README-en-US.md)
+一键编译运行、可视化输入输出面板、自动差异比对、资源统计、性能换算与轻量级运行时保护。
 
 ## ✨ 功能特性
 
@@ -16,7 +16,8 @@
 - **一键编译运行**：快捷键、命令面板、右键菜单，多种方式触发
 - **编译选项自定义**：C++ 标准（c++11/14/17/20/23）、优化级别（-O0 ~ -O3/-Os）、警告参数
 - **自动保存**：编译前自动保存脏文件，确保运行最新版本
-- **调试支持**：一键生成调试配置，启动 VS Code 调试会话
+- **调试功能已弃用**：保留旧命令兼容性，建议使用 VS Code 内置调试器
+- **GNU 扩展兼容**：macOS 可使用 `#include <bits/extc++.h>`，支持常用 `pb_ds` 接口
 
 ### 📝 输入输出管理
 - **三栏面板布局**：输入 / 预期输出 / 实际输出，侧边栏停靠
@@ -90,6 +91,7 @@
 | `optimizationLevel` | string | `-O2` | 编译优化级别 |
 | `warningFlags` | string[] | `[-Wall, -Wextra]` | 编译警告参数 |
 | `outputDirectory` | string | `""` | 编译产物输出目录 |
+| `sourceFileExtensions` | string[] | `["cpp", "cc", "cxx", "c++", "C"]` | C++ 源文件扩展名，匹配时不区分大小写 |
 
 ### 运行配置
 
@@ -100,6 +102,7 @@
 | `ignoreTrailingWhitespace` | boolean | `true` | 比对时忽略行尾空白 |
 | `panelRunKey` | string | `ctrl+enter` | 面板内运行快捷键 |
 | `showControls` | string[] | `[...]` | 面板可见控件 |
+| `showResultFields` | string[] | `["fileName", "status", "time"]` | 结果栏可见字段 |
 
 ### 性能换算
 
@@ -116,13 +119,25 @@
 | `expectedOutputFileExtensions` | string[] | `["txt", "out"]` | 预期输出文件扩展名 |
 | `largeFileThreshold` | number | `1048576` | 大文件阈值（字节）|
 
+### macOS GNU 扩展
+
+在 macOS 上可以使用：
+
+```cpp
+#include <bits/extc++.h>
+```
+
+Apple Clang 环境使用扩展内置的有限兼容层，支持常用的 `tree`、`find_by_order()`、`order_of_key()` 和 `gp_hash_table` 接口。配置为真实 GNU GCC/libstdc++ 时，扩展不会注入内置兼容目录，优先使用 GCC 自带实现。
+
+这些头文件不是 ISO C++ 标准的一部分，可能显著增加编译时间；需要完整 GNU `pb_ds` 行为时，请安装并配置 GNU GCC。
+
 ---
 
 ## 🖥️ 平台兼容性
 
 | 平台 | 编译运行 | 内存检测 | 调试 |
 |------|---------|---------|------|
-| **macOS** | ✅ g++/clang++ | ✅ `ps` 查询 RSS | ✅ lldb |
+| **macOS** | ✅ g++/clang++ | ✅ `ps` 查询 RSS | ⚠️ 调试命令已弃用 |
 | **Linux** | ✅ g++/clang++ | ✅ `/proc` 高精度 | ✅ gdb |
 | **Windows** | ✅ g++ (MinGW) | ⚠️ 精度有限 | ⚠️ 需 MinGW gdb |
 
@@ -141,9 +156,9 @@
 
 欢迎提交 Issue 和 Pull Request！
 
-- 🐛 报告 Bug：[Issues](https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge/issues)
-- 💡 功能建议：[Issues](https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge/issues)
-- 🔧 代码贡献：Fork 后提交 PR
+- 报告 Bug：[Issues](https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge/issues)
+- 功能建议：[Issues](https://github.com/Dai-Yizhou/ddd-vscode-cpp-judge/issues)
+- 代码贡献：Fork 后提交 PR
 
 - 欢迎加入QQ用户群：[1025918740](https://qm.qq.com/q/aeBkojHdao)
 
