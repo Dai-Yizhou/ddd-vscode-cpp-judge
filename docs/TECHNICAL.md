@@ -2,6 +2,12 @@
 
 本文档面向开发者，介绍项目架构、模块职责、核心流程和扩展点。
 
+## 0.2.1 兼容性说明
+
+macOS 编译流程支持用户源码中的 `#include <bits/extc++.h>`。当配置的编译器是 Apple Clang 或其他非 GNU 编译器时，Compiler 会注入扩展随附的 `headers/` 目录，提供常用 `pb_ds` 接口的有限兼容实现。当编译器版本输出被识别为真实 GNU GCC 时，不注入该目录，避免覆盖 GCC 自带的 `bits/extc++.h`、`ext/pb_ds` 和 libstdc++ 相关头文件。
+
+`bits/extc++.h`、`ext/pb_ds/*` 均属于 GNU 非标准扩展。Compiler 会检测源码是否包含这些头文件，并在 Runner 面板中提示可能显著增加编译时间。需要完整 GNU `pb_ds` 语义时，应配置 GNU GCC/libstdc++；Apple Clang 兼容层仅面向常见的顺序统计树和哈希表用法。
+
 ## 架构概览
 
 ```
@@ -48,7 +54,7 @@
 | **Extension Entry** | `src/extension.ts` | 扩展入口，命令注册，回调编排，面板生命周期管理 |
 | **RunnerPanelProvider** | `src/runnerPanel.ts` | Webview 面板提供者，渲染 UI，处理消息通信，持久化状态 |
 | **ConfigManager** | `src/configManager.ts` | 配置管理，读写 `settings.json`，交互式配置 |
-| **Compiler** | `src/compiler.ts` | 编译服务，调用 g++/clang++，参数拼接，诊断解析 |
+| **Compiler** | `src/compiler.ts` | 编译服务，调用 g++/clang++，工具链识别，GNU 扩展头文件选择，参数拼接，诊断解析 |
 | **Runner** | `src/runner.ts` | 执行服务，stdin 重定向，资源统计，两层运行时保护 |
 
 ### 工具模块
