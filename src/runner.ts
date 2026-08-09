@@ -70,6 +70,7 @@ export class Runner {
 
     constructor(
         private configManager: ConfigManager,
+        /** @deprecated outputChannel 仅为兼容旧日志流程保留。 */
         private outputChannel: vscode.OutputChannel
     ) {}
 

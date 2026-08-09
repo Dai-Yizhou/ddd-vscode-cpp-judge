@@ -3,6 +3,8 @@ import { LocaleStrings } from './index';
 const zhCN: LocaleStrings = {
     run: "运行",
     runTitle: "编译并运行 (Ctrl+Shift+R / Cmd+Shift+R)",
+    compileOptions: "编译选项",
+    compileOptionsTitle: "编译选项",
     cppStandard: "标准",
     cppStandardTitle: "C++ 语言标准",
     optimizationLevel: "优化",
@@ -14,7 +16,7 @@ const zhCN: LocaleStrings = {
     softMemoryLimit: "软内存",
     softMemoryLimitTitle: "软内存限制 (MB)，0 = 不限",
     sourceFile: "编译目标",
-    help: "说明",
+    help: "说明书",
     helpTitle: "查看使用说明 (Alt+H)",
     settings: "设置",
     settingsTitle: "打开设置页面 (Alt+S)",
@@ -54,12 +56,15 @@ const zhCN: LocaleStrings = {
     ce: "CE",
     compileError: "编译失败",
     runningElipsis: "运行中...",
-    matchOk: "输出与预期完全匹配",
-    matchSkip: "未设置预期输出，跳过比对",
+    matchOk: "输出与预期一致",
+    matchSkip: "未设置预期输出",
     matchDiff: "输出与预期不一致",
     consistent: "一致",
     inconsistent: "不一致",
-    largeFilePreview: "大文件预览",
+    largeFilePreview: "只读",
+    truncated: "已截断",
+    fileIoInput: "输入",
+    fileIoOutput: "输出",
     manual: "手动",
     auto: "自动",
     unknown: "未知",
@@ -73,10 +78,11 @@ const zhCN: LocaleStrings = {
     dropExpected: "松开以加载预期输出文件",
     dropUnknown: "无法识别拖拽内容，请拖拽文件或使用\"载入文件\"按钮",
     fileTooLarge: "过大，请用\"载入文件\"按钮",
-    fileLoadFail: "无法获取文件路径，请尝试点击\"载入文件\"按钮",
-    helpTitleModal: "C++ Runner 使用说明",
+    fileLoadFail: "无法获取文件路径，请用\"载入文件\"按钮",
+    helpTitleModal: "C++ Runner 说明书",
     helpClose: "关闭",
-    helpLoading: "加载中..."
+    helpLoading: "加载中...",
+    nonStandardHeaderWarning: "检测到 GNU 非标准头文件 <bits/extc++.h> 或 pb_ds，可能显著增加编译时间；Apple Clang 使用的是有限兼容实现，完整支持请配置 GNU GCC/libstdc++。"
 };
 
 export default zhCN;

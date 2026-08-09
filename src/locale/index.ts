@@ -4,6 +4,8 @@ import enUS from './en-US';
 export interface LocaleStrings {
     run: string;
     runTitle: string;
+    compileOptions: string;
+    compileOptionsTitle: string;
     cppStandard: string;
     cppStandardTitle: string;
     optimizationLevel: string;
@@ -61,6 +63,9 @@ export interface LocaleStrings {
     consistent: string;
     inconsistent: string;
     largeFilePreview: string;
+    truncated: string;
+    fileIoInput: string;
+    fileIoOutput: string;
     manual: string;
     auto: string;
     unknown: string;
@@ -78,6 +83,7 @@ export interface LocaleStrings {
     helpTitleModal: string;
     helpClose: string;
     helpLoading: string;
+    nonStandardHeaderWarning: string;
 }
 
 export type LocaleCode = 'zh-CN' | 'en-US';

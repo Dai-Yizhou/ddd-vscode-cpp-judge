@@ -3,6 +3,8 @@ import { LocaleStrings } from './index';
 const enUS: LocaleStrings = {
     run: "Run",
     runTitle: "Compile & Run (Ctrl+Shift+R / Cmd+Shift+R)",
+    compileOptions: "Options",
+    compileOptionsTitle: "Compile Options",
     cppStandard: "Std",
     cppStandardTitle: "C++ Language Standard",
     optimizationLevel: "Opt",
@@ -55,11 +57,14 @@ const enUS: LocaleStrings = {
     compileError: "Compile failed",
     runningElipsis: "Running...",
     matchOk: "Output matches expected exactly",
-    matchSkip: "No expected output set, skipping comparison",
+    matchSkip: "No expected output set",
     matchDiff: "Output differs from expected",
     consistent: "Match",
     inconsistent: "Mismatch",
-    largeFilePreview: "Large file preview",
+    largeFilePreview: "Read only",
+    truncated: "truncated",
+    fileIoInput: "Input",
+    fileIoOutput: "Output",
     manual: "manual",
     auto: "auto",
     unknown: "unknown",
@@ -73,10 +78,11 @@ const enUS: LocaleStrings = {
     dropExpected: "Release to load expected output file",
     dropUnknown: "Unrecognized content, please drop files or use \"Load File\" button",
     fileTooLarge: "too large, please use \"Load File\" button",
-    fileLoadFail: "Cannot get file path, try clicking \"Load File\" button",
+    fileLoadFail: "Cannot get file path, please use \"Load File\" button",
     helpTitleModal: "C++ Runner Help",
     helpClose: "Close",
-    helpLoading: "Loading..."
+    helpLoading: "Loading...",
+    nonStandardHeaderWarning: "GNU non-standard headers <bits/extc++.h> or pb_ds detected. Compilation may be significantly slower; Apple Clang uses a limited compatibility layer. Configure GNU GCC/libstdc++ for full support."
 };
 
 export default enUS;

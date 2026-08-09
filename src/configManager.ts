@@ -165,6 +165,46 @@ export class ConfigManager {
         return this.getConfig('actualOutputExtension', 'txt');
     }
 
+    getShowControls(): string[] {
+        return this.getConfig('showControls', ['cppStandard', 'helpBtn', 'settingsBtn']);
+    }
+
+    /**
+     * 获取结果栏显示字段列表 / Get visible result fields.
+     * @returns 字段数组，默认 ['fileName', 'status', 'time'] / Field array.
+     */
+    getShowResultFields(): string[] {
+        return this.getConfig('showResultFields', ['fileName', 'status', 'time']);
+    }
+
+    /**
+     * 获取 C++ 源文件扩展名列表 / Get C++ source file extensions.
+     * @returns 扩展名数组（不带前导点号），默认 ['cpp', 'cc', 'cxx', 'c++', 'C'] / Extensions array.
+     */
+    getSourceFileExtensions(): string[] {
+        return this.getConfig('sourceFileExtensions', ['cpp', 'cc', 'cxx', 'c++', 'C']);
+    }
+
+    /**
+     * 检查给定文件扩展名是否为 C++ 源文件 / Check if a file extension is a C++ source file.
+     * @param ext - 扩展名（带或不带前导点号）/ Extension with or without leading dot.
+     * @returns 是否为 C++ 源文件 / Whether it is a C++ source file.
+     */
+    isCppSourceFile(ext: string): boolean {
+        const normalized = ext.replace(/^\./, '').toLowerCase();
+        const extensions = this.getSourceFileExtensions().map(e => e.toLowerCase());
+        return extensions.includes(normalized);
+    }
+
+    /**
+     * 获取 C++ 源文件扩展名正则（大小写不敏感）/ Get case-insensitive C++ source extension regex.
+     * @returns 匹配扩展名的正则 / Regex matching C++ source extensions.
+     */
+    getSourceExtensionRegex(): RegExp {
+        const extensions = this.getSourceFileExtensions().map(e => e.replace(/\+/g, '\\+'));
+        return new RegExp(`\\.(${extensions.join('|')})$`, 'i');
+    }
+
     /**
      * 通过交互式 QuickPick 设置 C++ 标准和优化级别 /
      * Set C++ standard and optimization level interactively via QuickPick.

@@ -26,6 +26,7 @@ import { getPerformanceInfo } from './performanceCalculator';
 import { detectFileIo, resolveFileIoPath } from './fileIoDetector';
 import { setLocale, getStrings, LocaleCode } from './locale';
 
+/** @deprecated OutputChannel is retained for compatibility and is not the primary result surface. */
 let outputChannel: vscode.OutputChannel;
 let configManager: ConfigManager;
 let compiler: Compiler;
@@ -49,7 +50,7 @@ let extensionContext: vscode.ExtensionContext;
 export function activate(context: vscode.ExtensionContext) {
     outputChannel = vscode.window.createOutputChannel('C++ Runner');
     configManager = new ConfigManager();
-    compiler = new Compiler(configManager, outputChannel);
+    compiler = new Compiler(configManager, outputChannel, context.extensionPath);
     runner = new Runner(configManager, outputChannel);
     inputManager = new InputManager(context, configManager);
     expectedOutputManager = new ExpectedOutputManager(configManager);
@@ -105,7 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 注册底部面板 WebviewViewProvider
     // Register the bottom panel WebviewViewProvider
-    runnerPanelProvider = new RunnerPanelProvider(configManager);
+    runnerPanelProvider = new RunnerPanelProvider(configManager, extensionContext.extensionPath);
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('cppRunner.runnerView', runnerPanelProvider)
     );
@@ -152,7 +153,6 @@ async function compileAndRun() {
     // 清空并显示 OutputChannel，准备输出本次运行日志
     // Clear and show the OutputChannel to prepare for this run's logs
     outputChannel.clear();
-    outputChannel.show(true);
     outputChannel.appendLine(`=== C++ Runner: ${sourceFile} ===\n`);
 
     // 编译阶段
@@ -191,7 +191,7 @@ async function compileAndRun() {
 }
 
 /**
- * 在 OutputChannel 中展示运行结果
+ * @deprecated 在 OutputChannel 中展示运行结果，结果应以 Runner 面板为准。
  * Displays the run result in the OutputChannel.
  *
  * 输出内容包括 stdout、stderr、退出状态码、信号、运行时间及峰值内存。
@@ -240,9 +240,8 @@ async function handleSaveOutput(sourceFile: string, output: string) {
     if (behavior === 'never') return;
 
     const ext = configManager.getActualOutputExtension();
-    // 大小写不敏感匹配 .cpp（Windows 文件系统大小写不敏感）
-    // Case-insensitive .cpp match (Windows filesystem is case-insensitive)
-    const actualFile = sourceFile.replace(/\.cpp$/i, `.actual.${ext}`);
+    // 通用扩展名匹配 / Generic extension match
+    const actualFile = sourceFile.replace(/\.[^/.]+$/i, `.actual.${ext}`);
 
     fs.writeFileSync(actualFile, output);
     outputChannel.appendLine(`\nActual output saved to: ${actualFile}`);
@@ -261,6 +260,8 @@ async function debug() {
         vscode.window.showWarningMessage('Please open a C++ file first.');
         return;
     }
+    // 调试功能已弃用，保留兼容性 / Debug is deprecated, kept for compatibility
+    vscode.window.showWarningMessage('Debug is deprecated and may be removed in a future version. Use the built-in VS Code debugger instead. / 调试功能已弃用，后续版本可能移除。建议使用 VS Code 内置调试器。');
     await debuggerManager.debug(editor.document.fileName);
 }
 
@@ -480,6 +481,10 @@ async function openRunnerPanel() {
     const showControls = vscode.workspace.getConfiguration('cppRunner').get<string[]>('showControls', []);
     runnerPanelProvider?.setShowControls(showControls);
 
+    // 发送结果栏显示字段配置到 Webview
+    const showResultFields = vscode.workspace.getConfiguration('cppRunner').get<string[]>('showResultFields', []);
+    runnerPanelProvider?.setShowResultFields(showResultFields);
+
     // 从 docs/ 读取对应语言的帮助文档并发送到面板
     try {
         const locale = vscode.env.language.startsWith('zh') ? 'zh-CN' : 'en-US';
@@ -592,7 +597,8 @@ function registerPanelCallbacks() {
             return;
         } else {
             //即使过编也显示警告
-            runnerPanelProvider?.showCompileWarning(compileResult.stderr || '');
+            const compileWarning = [compileResult.stderr, compileResult.nonStandardHeaderWarning].filter(Boolean).join('\n\n');
+            runnerPanelProvider?.showCompileWarning(compileWarning);
         }
 
         // 文件 I/O 检测

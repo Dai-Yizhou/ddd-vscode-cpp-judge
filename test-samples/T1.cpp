@@ -3,8 +3,9 @@
 
 //#define _DEBUG_
 
-#include<iostream>
-#include<algorithm>
+//#include<iostream>
+//#include<algorithm>
+#include<bits/stdc++.h>
 using namespace std;
 using ll=long long;
 
