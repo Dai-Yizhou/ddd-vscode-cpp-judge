@@ -163,7 +163,7 @@ export class RunnerPanelProvider implements vscode.WebviewViewProvider {
         }
 
         if (!this.lastShowResultFields) {
-            this.lastShowResultFields = vscode.workspace.getConfiguration('cppRunner').get<string[]>('showResultFields', []);
+            this.lastShowResultFields = this.configManager.getShowResultFields();
             this.post({ command: 'showResultFields', fields: this.lastShowResultFields });
         } else {
             this.post({ command: 'showResultFields', fields: this.lastShowResultFields });
