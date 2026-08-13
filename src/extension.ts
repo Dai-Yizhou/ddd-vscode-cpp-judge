@@ -24,7 +24,6 @@ import { WebviewInputPanel } from './webviewInputPanel';
 import { RunnerPanelProvider, TestCaseResult } from './runnerPanel';
 import { getPerformanceInfo } from './performanceCalculator';
 import { detectFileIo, resolveFileIoPath } from './fileIoDetector';
-import { StatusBarManager } from './statusBar';
 import { setLocale, getStrings, LocaleCode } from './locale';
 
 /** @deprecated OutputChannel is retained for compatibility and is not the primary result surface. */
@@ -37,7 +36,6 @@ let expectedOutputManager: ExpectedOutputManager;
 let debuggerManager: DebuggerManager;
 let webviewPanel: WebviewInputPanel | undefined;
 let runnerPanelProvider: RunnerPanelProvider | undefined;
-let statusBarManager: StatusBarManager | undefined;
 let extensionContext: vscode.ExtensionContext;
 
 /**
@@ -112,12 +110,6 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.window.registerWebviewViewProvider('cppRunner.runnerView', runnerPanelProvider)
     );
-
-    // 初始化状态栏管理器（显示编译选项和输入文件信息在 VS Code 右下角状态栏）
-    // Initialize the status bar manager (shows compile options and input file info in the bottom-right status bar)
-    statusBarManager = new StatusBarManager(configManager, inputManager);
-    context.subscriptions.push(statusBarManager);
-    statusBarManager.update();
 
     // 注册面板回调（在 activate 中注册，确保通过活动栏图标打开面板时回调也可用）
     registerPanelCallbacks();
