@@ -928,35 +928,64 @@
             if (pressed === panelRunKey) { e.preventDefault(); runBtn.click(); }
         });
 
-        // 简易 Markdown 转 HTML（支持标题、段落、列表、代码）
+        // 简易 Markdown 转 HTML（支持标题、段落、列表、加粗、链接、行内代码）
         function markdownToHtml(md) {
             if (!md) return '';
             const lines = md.split('\\n');
             let html = '';
             let inList = false;
+            let inOrderedList = false;
+            let listCounter = 0;
             for (let line of lines) {
                 const trimmed = line.trim();
                 if (trimmed.startsWith('### ')) {
                     if (inList) { html += '</ul>'; inList = false; }
-                    html += '<h3 style="font-size:13px; margin:10px 0 4px;">' + escapeHtml(trimmed.slice(4)) + '</h3>';
+                    if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                    html += '<h3 style="font-size:13px; margin:10px 0 4px;">' + inlineMarkdown(trimmed.slice(4)) + '</h3>';
                 } else if (trimmed.startsWith('## ')) {
                     if (inList) { html += '</ul>'; inList = false; }
-                    html += '<h3 style="font-size:13px; margin:10px 0 4px;">' + escapeHtml(trimmed.slice(3)) + '</h3>';
+                    if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                    html += '<h3 style="font-size:13px; margin:10px 0 4px;">' + inlineMarkdown(trimmed.slice(3)) + '</h3>';
                 } else if (trimmed.startsWith('# ')) {
                     if (inList) { html += '</ul>'; inList = false; }
-                    html += '<h3 style="font-size:13px; margin:10px 0 4px;">' + escapeHtml(trimmed.slice(2)) + '</h3>';
+                    if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                    html += '<h3 style="font-size:13px; margin:10px 0 4px;">' + inlineMarkdown(trimmed.slice(2)) + '</h3>';
                 } else if (trimmed.startsWith('- ') || trimmed.startsWith('  - ')) {
+                    if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
                     if (!inList) { html += '<ul style="margin:4px 0 4px 20px;">'; inList = true; }
-                    html += '<li>' + escapeHtml(trimmed.replace(/^\\s*-\\s*/, '')) + '</li>';
+                    html += '<li>' + inlineMarkdown(trimmed.replace(/^\\s*-\\s*/, '')) + '</li>';
+                } else if (/^\d+[.)]\s/.test(trimmed)) {
+                    if (inList) { html += '</ul>'; inList = false; }
+                    if (!inOrderedList) { html += '<ol style="margin:4px 0 4px 20px;">'; inOrderedList = true; listCounter = 0; }
+                    html += '<li>' + inlineMarkdown(trimmed.replace(/^\d+[.)]\s*/, '')) + '</li>';
                 } else if (trimmed === '') {
                     if (inList) { html += '</ul>'; inList = false; }
+                    if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
                 } else {
                     if (inList) { html += '</ul>'; inList = false; }
-                    html += '<p style="margin:2px 0;">' + escapeHtml(trimmed) + '</p>';
+                    if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
+                    html += '<p style="margin:2px 0;">' + inlineMarkdown(trimmed) + '</p>';
                 }
             }
             if (inList) html += '</ul>';
+            if (inOrderedList) html += '</ol>';
             return html;
+        }
+        // 处理行内 Markdown（加粗、链接、行内代码），同时转义 HTML 特殊字符
+        function inlineMarkdown(text) {
+            // 先转义 HTML 特殊字符
+            var escaped = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+            // 处理行内代码 `` `code` ``（优先级最高，避免代码内的 markdown 语法被误解析）
+            escaped = escaped.replace(/`([^`]+)`/g, '<code style="background-color:var(--vscode-textCodeBlock-background);padding:1px 4px;border-radius:3px;font-size:inherit;">$1</code>');
+            // 处理链接 [text](url)
+            escaped = escaped.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:var(--vscode-textLink-foreground);text-decoration:underline;">$1</a>');
+            // 处理加粗 **text**
+            escaped = escaped.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            return escaped;
         }
     </script>
 </body>
