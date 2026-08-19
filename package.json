@@ -2,7 +2,7 @@
   "name": "vscode-cpp-runner",
   "displayName": "C++ Runner",
   "description": "Compile and run C++ single files with input/output management and diff comparison",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "publisher": "cpp-runner",
   "license": "MIT",
   "engines": {

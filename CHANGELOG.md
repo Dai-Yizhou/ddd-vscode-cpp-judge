@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.3] - 2026-08-19
+
+### Fixed
+- 移除残留的 VS Code 底栏状态栏模块及其构建产物
+- 修复帮助文档 Markdown 换行解析，恢复标题、列表和段落的正常渲染
+
 ## [0.2.2] - 2026-08-12
 
 ### Fixed
