@@ -67,7 +67,6 @@ macOS 编译流程支持用户源码中的 `#include <bits/extc++.h>`。当配�
 | **FileIoDetector** | `src/fileIoDetector.ts` | 检测源码中的 freopen/fopen/fstream |
 | **PerformanceCalculator** | `src/performanceCalculator.ts` | 基于 GB6 分数的评测机时间换算 |
 | **DebuggerManager** | `src/debugger.ts` | 生成/更新 `launch.json`，启动调试会话 |
-| **StatusBar** | `src/statusBar.ts` | 状态栏显示编译选项与关联文件名 |
 | **Locale** | `src/locale/index.ts` | 多语言管理（zh-CN / en-US） |
 
 ## 核心流程

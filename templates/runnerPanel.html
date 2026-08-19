@@ -931,7 +931,7 @@
         // 简易 Markdown 转 HTML（支持标题、段落、列表、加粗、链接、行内代码）
         function markdownToHtml(md) {
             if (!md) return '';
-            const lines = md.split('\\n');
+            const lines = md.split('\n');
             let html = '';
             let inList = false;
             let inOrderedList = false;
@@ -953,7 +953,7 @@
                 } else if (trimmed.startsWith('- ') || trimmed.startsWith('  - ')) {
                     if (inOrderedList) { html += '</ol>'; inOrderedList = false; }
                     if (!inList) { html += '<ul style="margin:4px 0 4px 20px;">'; inList = true; }
-                    html += '<li>' + inlineMarkdown(trimmed.replace(/^\\s*-\\s*/, '')) + '</li>';
+                    html += '<li>' + inlineMarkdown(trimmed.replace(/^\s*-\s*/, '')) + '</li>';
                 } else if (/^\d+[.)]\s/.test(trimmed)) {
                     if (inList) { html += '</ul>'; inList = false; }
                     if (!inOrderedList) { html += '<ol style="margin:4px 0 4px 20px;">'; inOrderedList = true; listCounter = 0; }
